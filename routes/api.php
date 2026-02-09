@@ -28,6 +28,7 @@ Route::middleware(['auth.firebase'])->group(function () {
     Route::get('/leagues', [LeagueController::class, 'index']);
     Route::post('/leagues', [LeagueController::class, 'store']);
     Route::get('/leagues/{id}', [LeagueController::class, 'show']);
+    Route::post('/leagues/{id}', [LeagueController::class, 'update']);
     Route::get('/leagues/{id}/ranking', [LeagueController::class, 'ranking']);
     Route::post('/leagues/join', [LeagueController::class, 'join']);
 

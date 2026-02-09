@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Actions\CreateLeagueAction;
 use App\Actions\JoinLeagueAction;
+use App\Actions\UpdateLeagueAction;
 use App\Http\Resources\LeagueResource;
 use App\Models\League;
 use Illuminate\Http\JsonResponse;
@@ -36,6 +37,28 @@ class LeagueController extends Controller
             'message' => 'League created successfully',
             'data' => new LeagueResource($league->load(['competition', 'owner'])),
         ], 201);
+    }
+
+    public function update(Request $request, string $id, UpdateLeagueAction $action): JsonResponse
+    {
+        $league = League::findOrFail($id);
+
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
+            'avatar' => 'nullable|image|max:10240',
+            'description' => 'nullable|string',
+        ]);
+
+        try {
+            $updatedLeague = $action->execute($request->user(), $league, $validated);
+        } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
+            return response()->json(['message' => $e->getMessage()], 403);
+        }
+
+        return response()->json([
+            'message' => 'League updated successfully',
+            'data' => new LeagueResource($updatedLeague->load(['competition', 'owner'])),
+        ]);
     }
 
     public function show(string $id): JsonResponse
