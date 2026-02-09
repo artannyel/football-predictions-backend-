@@ -26,7 +26,7 @@ class LeagueController extends Controller
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'competition_id' => 'required|exists:competitions,external_id',
-            'avatar' => 'nullable|image|max:2048', // Max 2MB
+            'avatar' => 'nullable|image|max:10240',
             'description' => 'nullable|string',
         ]);
 
