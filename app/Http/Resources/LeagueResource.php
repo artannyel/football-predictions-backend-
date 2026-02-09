@@ -19,7 +19,7 @@ class LeagueResource extends JsonResource
             'id' => $this->id,
             'name' => $this->name,
             'code' => $this->code,
-            'avatar' => $this->avatar ? Storage::url($this->avatar) : null,
+            'avatar' => $this->avatar ? asset(Storage::url($this->avatar)) : null,
             'description' => $this->description,
             'competition' => [
                 'id' => $this->competition->external_id,
@@ -35,7 +35,6 @@ class LeagueResource extends JsonResource
             'my_points' => $this->whenPivotLoaded('league_user', function () {
                 return $this->pivot->points;
             }),
-            // Se estivermos listando detalhes, podemos incluir o ranking
             'ranking' => $this->when($request->routeIs('leagues.show'), function () {
                 return $this->members->map(function ($member) {
                     return [
