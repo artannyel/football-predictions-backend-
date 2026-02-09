@@ -63,6 +63,7 @@ class User extends Authenticatable
                 'error_count',
                 'total_predictions'
             ])
+            ->orderBy('created_at')
             ->withTimestamps();
     }
 
