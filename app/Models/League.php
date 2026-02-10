@@ -20,6 +20,7 @@ class League extends Model
         'code',
         'avatar',
         'description',
+        'is_active',
     ];
 
     public static function generateCode(): string

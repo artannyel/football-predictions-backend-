@@ -21,6 +21,7 @@ class LeagueResource extends JsonResource
             'code' => $this->code,
             'avatar' => $this->avatar ? asset(Storage::url($this->avatar)) : null,
             'description' => $this->description,
+            'is_active' => $this->is_active,
             'competition' => [
                 'id' => $this->competition->external_id,
                 'name' => $this->competition->name,
