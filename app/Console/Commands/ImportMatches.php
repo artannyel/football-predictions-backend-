@@ -45,8 +45,16 @@ class ImportMatches extends Command
 
             $this->info("Starting match import for {$competitions->count()} competitions...");
 
-            foreach ($competitions as $competition) {
+            foreach ($competitions as $index => $competition) {
                 $this->importMatchesForCompetition($service, $competition->external_id);
+
+                // Rate Limit Protection: Sleep 7 seconds between requests
+                // 60s / 7s = ~8.5 requests per minute (Safe limit is 10)
+                if ($index < $competitions->count() - 1) {
+                    $this->info("Sleeping for 7 seconds to respect API rate limit...");
+                    sleep(7);
+                }
+
                 $this->newLine();
             }
         }
