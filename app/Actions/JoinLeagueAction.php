@@ -5,6 +5,7 @@ namespace App\Actions;
 use App\Models\League;
 use App\Models\User;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Validation\ValidationException;
 
 class JoinLeagueAction
 {
@@ -14,6 +15,12 @@ class JoinLeagueAction
 
         if (!$league) {
             throw new ModelNotFoundException("League with code {$code} not found.");
+        }
+
+        if (!$league->is_active) {
+            throw ValidationException::withMessages([
+                'code' => 'This league is closed and cannot accept new members.',
+            ]);
         }
 
         if ($league->members()->where('user_id', $user->id)->exists()) {
