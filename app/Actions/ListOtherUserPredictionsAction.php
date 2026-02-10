@@ -3,22 +3,19 @@
 namespace App\Actions;
 
 use App\Models\Prediction;
-use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 
 class ListOtherUserPredictionsAction
 {
-    public function execute(string $targetUserId, string $leagueId): Collection
+    public function execute(string $targetUserId, string $leagueId, int $perPage = 20): LengthAwarePaginator
     {
-        return Prediction::where('user_id', $targetUserId)
-            ->where('league_id', $leagueId)
-            ->whereHas('match', function ($query) {
-                $query->where('utc_date', '<=', now()); // Apenas jogos que já começaram
-            })
+        return Prediction::select('predictions.*')
+            ->join('matches', 'predictions.match_id', '=', 'matches.external_id')
+            ->where('predictions.user_id', $targetUserId)
+            ->where('predictions.league_id', $leagueId)
+            ->where('matches.utc_date', '<=', now()) // Apenas jogos que já começaram
             ->with(['match.homeTeam', 'match.awayTeam'])
-            ->get()
-            ->sortByDesc(function ($prediction) {
-                return $prediction->match->utc_date;
-            })
-            ->values();
+            ->orderBy('matches.utc_date', 'desc')
+            ->paginate($perPage);
     }
 }

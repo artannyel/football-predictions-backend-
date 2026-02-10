@@ -32,7 +32,12 @@ class PredictionController extends Controller
 
     public function index(Request $request): JsonResponse
     {
+        $request->validate([
+            'per_page' => 'nullable|integer|min:1|max:100',
+        ]);
+
         $leagueId = $request->query('league_id');
+        $perPage = $request->query('per_page', 20);
 
         $query = $request->user()->predictions()
             ->with(['match.homeTeam', 'match.awayTeam'])
@@ -42,20 +47,21 @@ class PredictionController extends Controller
             $query->where('league_id', $leagueId);
         }
 
-        $predictions = $query->get();
+        $predictions = $query->paginate($perPage);
 
-        return response()->json([
-            'data' => PredictionResource::collection($predictions),
-        ]);
+        return response()->json(
+            PredictionResource::collection($predictions)->response()->getData(true)
+        );
     }
 
     // Esta rota será movida para /leagues/{id}/predictions/upcoming
     public function upcoming(Request $request, ListUpcomingPredictionsAction $action): JsonResponse
     {
+        $request->validate([
+            'league_id' => 'required|uuid|exists:leagues,id',
+        ]);
+
         $leagueId = $request->query('league_id');
-        if (!$leagueId) {
-            return response()->json(['message' => 'league_id is required'], 400);
-        }
 
         $predictions = $action->execute($request->user(), $leagueId);
 
@@ -77,12 +83,14 @@ class PredictionController extends Controller
     {
         $request->validate([
             'league_id' => 'required|uuid|exists:leagues,id',
+            'per_page' => 'nullable|integer|min:1|max:100',
         ]);
 
         $leagueId = $request->query('league_id');
+        $perPage = $request->query('per_page', 20);
         $currentUser = $request->user();
 
-        // 1. Verifica se a liga existe (já validado pelo exists, mas precisamos do model)
+        // 1. Verifica se a liga existe
         $league = League::findOrFail($leagueId);
 
         // 2. Verifica se o usuário solicitante é membro da liga
@@ -95,10 +103,10 @@ class PredictionController extends Controller
             return response()->json(['message' => 'Target user is not a member of this league.'], 404);
         }
 
-        $predictions = $action->execute($userId, $leagueId);
+        $predictions = $action->execute($userId, $leagueId, $perPage);
 
-        return response()->json([
-            'data' => PredictionResource::collection($predictions),
-        ]);
+        return response()->json(
+            PredictionResource::collection($predictions)->response()->getData(true)
+        );
     }
 }
