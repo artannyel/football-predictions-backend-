@@ -14,29 +14,38 @@ class FirebaseServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->singleton(Auth::class, function ($app) {
-            $envPath = env('FIREBASE_CREDENTIALS');
+            $credentials = env('FIREBASE_CREDENTIALS');
 
-            if (!$envPath) {
+            if (!$credentials) {
                 throw new \Exception('FIREBASE_CREDENTIALS not defined in .env');
             }
 
-            // Check if path is absolute, if not, assume it's relative to base path
-            $credentialsPath = $envPath;
-            if (!str_starts_with($envPath, '/')) {
-                $credentialsPath = base_path($envPath);
-            }
+            // Se for um JSON válido (começa com {), usa direto
+            if (str_starts_with(trim($credentials), '{')) {
+                // Salva em um arquivo temporário porque a lib exige arquivo ou array
+                // Mas a lib aceita array direto no withServiceAccount? Sim!
+                $credentialsArray = json_decode($credentials, true);
+                if (!$credentialsArray) {
+                    throw new \Exception('Invalid JSON in FIREBASE_CREDENTIALS');
+                }
+                $factory = (new Factory)->withServiceAccount($credentialsArray);
+            } else {
+                // É um caminho de arquivo
+                $credentialsPath = $credentials;
+                if (!str_starts_with($credentials, '/')) {
+                    $credentialsPath = base_path($credentials);
+                }
 
-            if (!file_exists($credentialsPath)) {
-                 // Try storage path as a fallback if the user put it there but used a relative path
-                 $storagePath = storage_path('app/' . $envPath);
-                 if (file_exists($storagePath)) {
-                     $credentialsPath = $storagePath;
-                 } else {
-                     throw new \Exception("Firebase credentials file not found at: $credentialsPath or $storagePath");
-                 }
+                if (!file_exists($credentialsPath)) {
+                     $storagePath = storage_path('app/' . $credentials);
+                     if (file_exists($storagePath)) {
+                         $credentialsPath = $storagePath;
+                     } else {
+                         throw new \Exception("Firebase credentials file not found at: $credentialsPath");
+                     }
+                }
+                $factory = (new Factory)->withServiceAccount($credentialsPath);
             }
-
-            $factory = (new Factory)->withServiceAccount($credentialsPath);
 
             return $factory->createAuth();
         });
