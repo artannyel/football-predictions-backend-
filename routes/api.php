@@ -23,7 +23,7 @@ Route::middleware(['auth.firebase'])->group(function () {
     // Competitions
     Route::get('/competitions', [CompetitionController::class, 'index']);
     Route::get('/competitions/{id}/matches', [CompetitionController::class, 'matches']);
-    Route::get('/competitions/{id}/matches/upcoming', [CompetitionController::class, 'upcomingMatches']);
+    // Route::get('/competitions/{id}/matches/upcoming', [CompetitionController::class, 'upcomingMatches']); // Deprecated em favor de /leagues/{id}/matches/upcoming
 
     // Leagues
     Route::get('/leagues', [LeagueController::class, 'index']);
@@ -33,11 +33,14 @@ Route::middleware(['auth.firebase'])->group(function () {
     Route::post('/leagues/{id}', [LeagueController::class, 'update']);
     Route::get('/leagues/{id}/ranking', [LeagueController::class, 'ranking']);
 
+    // Jogos disponíveis para palpitar NA LIGA
+    Route::get('/leagues/{id}/matches/upcoming', [LeagueController::class, 'upcomingMatches']);
+
     // Predictions
-    Route::get('/predictions', [PredictionController::class, 'index']);
-    Route::post('/predictions', [PredictionController::class, 'store']);
-    Route::get('/predictions/upcoming', [PredictionController::class, 'upcoming']);
-    Route::get('/predictions/user/{userId}', [PredictionController::class, 'userPredictions']); // Nova rota
+    Route::get('/predictions', [PredictionController::class, 'index']); // Pode filtrar por ?league_id=...
+    Route::post('/predictions', [PredictionController::class, 'store']); // Exige league_id no body
+    Route::get('/predictions/upcoming', [PredictionController::class, 'upcoming']); // Exige ?league_id=...
+    Route::get('/predictions/user/{userId}', [PredictionController::class, 'userPredictions']);
     Route::get('/predictions/{id}', [PredictionController::class, 'show']);
 
     // Rules

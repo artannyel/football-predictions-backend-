@@ -7,20 +7,16 @@ use Illuminate\Database\Eloquent\Collection;
 
 class ListUpcomingPredictionsAction
 {
-    public function execute(User $user, ?int $competitionId = null): Collection
+    public function execute(User $user, string $leagueId): Collection
     {
-        $query = $user->predictions()
-            ->whereHas('match', function ($q) use ($competitionId) {
+        return $user->predictions()
+            ->where('league_id', $leagueId)
+            ->whereHas('match', function ($q) {
                 $q->where('utc_date', '>', now())
                   ->where('utc_date', '<=', now()->addDays(3));
-
-                if ($competitionId) {
-                    $q->where('competition_id', $competitionId);
-                }
             })
-            ->with(['match.homeTeam', 'match.awayTeam']);
-
-        return $query->get()
+            ->with(['match.homeTeam', 'match.awayTeam'])
+            ->get()
             ->sortBy(function ($prediction) {
                 return $prediction->match->utc_date;
             })

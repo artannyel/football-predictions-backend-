@@ -4,8 +4,10 @@ namespace App\Http\Controllers;
 
 use App\Actions\CreateLeagueAction;
 use App\Actions\JoinLeagueAction;
+use App\Actions\ListUpcomingCompetitionMatchesAction;
 use App\Actions\UpdateLeagueAction;
 use App\Http\Resources\LeagueResource;
+use App\Http\Resources\MatchResource;
 use App\Models\League;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -82,7 +84,7 @@ class LeagueController extends Controller
             ->orderByPivot('winner_goal_count', 'desc')
             ->orderByPivot('winner_only_count', 'desc')
             ->orderByPivot('error_count', 'asc')
-            ->paginate(20);
+            ->paginate(50);
 
         return response()->json([
             'league_name' => $league->name,
@@ -91,7 +93,7 @@ class LeagueController extends Controller
                     'rank' => ($members->currentPage() - 1) * $members->perPage() + $index + 1,
                     'user_id' => $member->id,
                     'name' => $member->name,
-                    'photo_url' => $member->photo_url ? asset(Storage::url($member->photo_url)) : null,
+                    'photo_url' => $member->photo_url ? asset(Storage::disk('public')->url($member->photo_url)) : null,
                     'points' => $member->pivot->points,
                     'stats' => [
                         'exact_score' => $member->pivot->exact_score_count,
@@ -108,6 +110,16 @@ class LeagueController extends Controller
                 'last_page' => $members->lastPage(),
                 'total' => $members->total(),
             ]
+        ]);
+    }
+
+    public function upcomingMatches(Request $request, string $id, ListUpcomingCompetitionMatchesAction $action): JsonResponse
+    {
+        // $id aqui é o ID da Liga
+        $matches = $action->execute($id, $request->user()->id);
+
+        return response()->json([
+            'data' => MatchResource::collection($matches),
         ]);
     }
 

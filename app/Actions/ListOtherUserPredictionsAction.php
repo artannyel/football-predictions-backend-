@@ -7,12 +7,12 @@ use Illuminate\Database\Eloquent\Collection;
 
 class ListOtherUserPredictionsAction
 {
-    public function execute(string $userId, int $competitionId): Collection
+    public function execute(string $targetUserId, string $leagueId): Collection
     {
-        return Prediction::where('user_id', $userId)
-            ->whereHas('match', function ($query) use ($competitionId) {
-                $query->where('competition_id', $competitionId)
-                      ->where('utc_date', '<=', now()); // Apenas jogos que já começaram
+        return Prediction::where('user_id', $targetUserId)
+            ->where('league_id', $leagueId)
+            ->whereHas('match', function ($query) {
+                $query->where('utc_date', '<=', now()); // Apenas jogos que já começaram
             })
             ->with(['match.homeTeam', 'match.awayTeam'])
             ->get()

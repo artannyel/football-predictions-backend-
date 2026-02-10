@@ -12,6 +12,7 @@ class Prediction extends Model
 
     protected $fillable = [
         'user_id',
+        'league_id',
         'match_id',
         'home_score',
         'away_score',
@@ -22,6 +23,11 @@ class Prediction extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function league(): BelongsTo
+    {
+        return $this->belongsTo(League::class);
     }
 
     public function match(): BelongsTo
