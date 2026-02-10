@@ -23,7 +23,6 @@ Route::middleware(['auth.firebase'])->group(function () {
     // Competitions
     Route::get('/competitions', [CompetitionController::class, 'index']);
     Route::get('/competitions/{id}/matches', [CompetitionController::class, 'matches']);
-    // Route::get('/competitions/{id}/matches/upcoming', [CompetitionController::class, 'upcomingMatches']); // Deprecated em favor de /leagues/{id}/matches/upcoming
 
     // Leagues
     Route::get('/leagues', [LeagueController::class, 'index']);
