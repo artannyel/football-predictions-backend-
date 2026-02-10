@@ -24,6 +24,7 @@ class StoreUserRequest extends FormRequest
         return [
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:255'],
+            'photo_url' => ['nullable', 'image', 'max:10240'], // Max 10MB
         ];
     }
 }

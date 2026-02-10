@@ -5,6 +5,7 @@ use App\Http\Controllers\LeagueController;
 use App\Http\Controllers\PredictionController;
 use App\Http\Controllers\RulesController;
 use App\Http\Controllers\UserController;
+use App\Http\Resources\UserResource;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -13,7 +14,7 @@ Route::middleware(['auth.firebase'])->group(function () {
     Route::get('/user', function (Request $request) {
         return response()->json([
             'message' => 'Autenticado com sucesso via Firebase!',
-            'user' => $request->user(),
+            'user' => new UserResource($request->user()),
         ]);
     });
 
@@ -36,6 +37,7 @@ Route::middleware(['auth.firebase'])->group(function () {
     Route::get('/predictions', [PredictionController::class, 'index']);
     Route::post('/predictions', [PredictionController::class, 'store']);
     Route::get('/predictions/upcoming', [PredictionController::class, 'upcoming']);
+    Route::get('/predictions/user/{userId}', [PredictionController::class, 'userPredictions']); // Nova rota
     Route::get('/predictions/{id}', [PredictionController::class, 'show']);
 
     // Rules

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Actions\ListOtherUserPredictionsAction;
 use App\Actions\ListUpcomingPredictionsAction;
 use App\Actions\StorePredictionAction;
 use App\Http\Resources\PredictionResource;
@@ -65,6 +66,21 @@ class PredictionController extends Controller
 
         return response()->json([
             'data' => new PredictionResource($prediction),
+        ]);
+    }
+
+    public function userPredictions(Request $request, string $userId, ListOtherUserPredictionsAction $action): JsonResponse
+    {
+        $request->validate([
+            'competition_id' => 'required|integer|exists:competitions,external_id',
+        ]);
+
+        $competitionId = $request->query('competition_id');
+
+        $predictions = $action->execute($userId, $competitionId);
+
+        return response()->json([
+            'data' => PredictionResource::collection($predictions),
         ]);
     }
 }

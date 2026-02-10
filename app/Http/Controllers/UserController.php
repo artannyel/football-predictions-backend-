@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Actions\CreateOrUpdateUserAction;
 use App\DTOs\UserDTO;
 use App\Http\Requests\StoreUserRequest;
+use App\Http\Resources\UserResource;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -20,8 +21,8 @@ class UserController extends Controller
         $user = $action->execute($dto);
 
         return response()->json([
-            'message' => 'User registered successfully',
-            'user' => $user,
-        ], 201);
+            'message' => 'User updated successfully',
+            'data' => new UserResource($user),
+        ]);
     }
 }

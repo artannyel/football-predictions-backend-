@@ -9,6 +9,7 @@ use App\Http\Resources\LeagueResource;
 use App\Models\League;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 
 class LeagueController extends Controller
@@ -81,7 +82,7 @@ class LeagueController extends Controller
             ->orderByPivot('winner_goal_count', 'desc')
             ->orderByPivot('winner_only_count', 'desc')
             ->orderByPivot('error_count', 'asc')
-            ->paginate(50);
+            ->paginate(20);
 
         return response()->json([
             'league_name' => $league->name,
@@ -90,7 +91,7 @@ class LeagueController extends Controller
                     'rank' => ($members->currentPage() - 1) * $members->perPage() + $index + 1,
                     'user_id' => $member->id,
                     'name' => $member->name,
-                    'photo_url' => $member->photo_url,
+                    'photo_url' => $member->photo_url ? asset(Storage::url($member->photo_url)) : null,
                     'points' => $member->pivot->points,
                     'stats' => [
                         'exact_score' => $member->pivot->exact_score_count,
