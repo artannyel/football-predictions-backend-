@@ -7,8 +7,10 @@ use App\Actions\ListUpcomingPredictionsAction;
 use App\Actions\StorePredictionAction;
 use App\Http\Resources\PredictionResource;
 use App\Models\League;
+use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 
 class PredictionController extends Controller
 {
@@ -98,15 +100,32 @@ class PredictionController extends Controller
             return response()->json(['message' => 'You are not a member of this league.'], 403);
         }
 
-        // 3. Verifica se o usuário alvo é membro da liga
-        if (!$league->members()->where('user_id', $userId)->exists()) {
+        // 3. Verifica se o usuário alvo é membro da liga e pega seus dados pivot
+        $targetMember = $league->members()->where('user_id', $userId)->first();
+
+        if (!$targetMember) {
             return response()->json(['message' => 'Target user is not a member of this league.'], 404);
         }
 
         $predictions = $action->execute($userId, $leagueId, $perPage);
+        $paginatedData = PredictionResource::collection($predictions)->response()->getData(true);
 
-        return response()->json(
-            PredictionResource::collection($predictions)->response()->getData(true)
-        );
+        return response()->json([
+            'user' => [
+                'id' => $targetMember->id,
+                'name' => $targetMember->name,
+                'photo_url' => $targetMember->photo_url ? asset(Storage::disk('public')->url($targetMember->photo_url)) : null,
+                'stats' => [
+                    'points' => $targetMember->pivot->points,
+                    'exact_score' => $targetMember->pivot->exact_score_count,
+                    'winner_diff' => $targetMember->pivot->winner_diff_count,
+                    'winner_goal' => $targetMember->pivot->winner_goal_count,
+                    'winner_only' => $targetMember->pivot->winner_only_count,
+                    'errors' => $targetMember->pivot->error_count,
+                    'total' => $targetMember->pivot->total_predictions,
+                ]
+            ],
+            'predictions' => $paginatedData
+        ]);
     }
 }
