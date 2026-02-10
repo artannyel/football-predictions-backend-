@@ -9,6 +9,15 @@ use App\Http\Resources\UserResource;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
+// Rota pública de Health Check / Ping
+Route::get('/ping', function () {
+    return response()->json([
+        'status' => 'ok',
+        'timestamp' => now()->toIso8601String(),
+        'service' => 'football-predictions-api'
+    ]);
+});
+
 Route::middleware(['auth.firebase'])->group(function () {
 
     Route::get('/user', function (Request $request) {
