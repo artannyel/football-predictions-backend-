@@ -13,18 +13,27 @@ class CalculatePredictionPointsAction
      */
     public function execute(Prediction $prediction, FootballMatch $match): array
     {
-        if ($match->status !== 'FINISHED') {
+        // Se o jogo ainda não começou (SCHEDULED, TIMED), retorna 0
+        if ($match->utc_date > now() && $match->status === 'SCHEDULED') {
             return ['points' => 0, 'type' => 'PENDING'];
         }
 
         $predHome = $prediction->home_score;
         $predAway = $prediction->away_score;
 
+        // Usamos o placar Full Time. Se estiver em andamento, a API geralmente preenche o fullTime com o placar atual.
         $realHome = $match->score_fulltime_home;
         $realAway = $match->score_fulltime_away;
 
+        // Se não tiver placar ainda (ex: jogo começou mas API não mandou 0-0), assume 0-0 ou retorna erro
         if (is_null($realHome) || is_null($realAway)) {
-            return ['points' => 0, 'type' => 'ERROR_API'];
+            // Tenta usar halftime se fulltime for null (raro)
+            $realHome = $match->score_halftime_home;
+            $realAway = $match->score_halftime_away;
+
+            if (is_null($realHome) || is_null($realAway)) {
+                 return ['points' => 0, 'type' => 'PENDING'];
+            }
         }
 
         // 1. Placar Exato (7 pontos)
