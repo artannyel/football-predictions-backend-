@@ -15,13 +15,14 @@ class UserResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
+        $disk = config('filesystems.default');
+
         return [
             'id' => $this->id,
             'firebase_uid' => $this->firebase_uid,
             'name' => $this->name,
             'email' => $this->email,
-            // Força o uso do disco 'public' para gerar a URL correta
-            'photo_url' => $this->photo_url ? asset(Storage::url($this->photo_url)) : null,
+            'photo_url' => $this->photo_url ? asset(Storage::disk($disk)->url($this->photo_url)) : null,
             'created_at' => $this->created_at,
         ];
     }

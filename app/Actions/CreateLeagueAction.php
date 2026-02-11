@@ -23,7 +23,8 @@ class CreateLeagueAction
                 ->cover(500, 500)
                 ->toJpeg(80);
 
-            Storage::disk('public')->put($path, (string) $image);
+            // Usa o disco configurado no .env (public localmente, s3 em produção)
+            Storage::disk(config('filesystems.default'))->put($path, (string) $image, 'public');
 
             $avatarPath = $path;
         }

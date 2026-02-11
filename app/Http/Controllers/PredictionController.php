@@ -7,14 +7,12 @@ use App\Actions\ListUpcomingPredictionsAction;
 use App\Actions\StorePredictionAction;
 use App\Http\Resources\PredictionResource;
 use App\Models\League;
-use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 
 class PredictionController extends Controller
 {
-    // Esta rota será movida para dentro de /leagues/{id}/predictions
     public function store(Request $request, StorePredictionAction $action): JsonResponse
     {
         $validated = $request->validate([
@@ -56,7 +54,6 @@ class PredictionController extends Controller
         );
     }
 
-    // Esta rota será movida para /leagues/{id}/predictions/upcoming
     public function upcoming(Request $request, ListUpcomingPredictionsAction $action): JsonResponse
     {
         $request->validate([
@@ -91,16 +88,14 @@ class PredictionController extends Controller
         $leagueId = $request->query('league_id');
         $perPage = $request->query('per_page', 20);
         $currentUser = $request->user();
+        $disk = config('filesystems.default');
 
-        // 1. Verifica se a liga existe
         $league = League::findOrFail($leagueId);
 
-        // 2. Verifica se o usuário solicitante é membro da liga
         if (!$league->members()->where('user_id', $currentUser->id)->exists()) {
             return response()->json(['message' => 'You are not a member of this league.'], 403);
         }
 
-        // 3. Verifica se o usuário alvo é membro da liga e pega seus dados pivot
         $targetMember = $league->members()->where('user_id', $userId)->first();
 
         if (!$targetMember) {
@@ -114,7 +109,7 @@ class PredictionController extends Controller
             'user' => [
                 'id' => $targetMember->id,
                 'name' => $targetMember->name,
-                'photo_url' => $targetMember->photo_url ? asset(Storage::disk('public')->url($targetMember->photo_url)) : null,
+                'photo_url' => $targetMember->photo_url ? asset(Storage::disk($disk)->url($targetMember->photo_url)) : null,
                 'stats' => [
                     'points' => $targetMember->pivot->points,
                     'exact_score' => $targetMember->pivot->exact_score_count,

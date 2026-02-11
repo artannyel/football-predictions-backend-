@@ -15,11 +15,13 @@ class LeagueResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
+        $disk = config('filesystems.default');
+
         return [
             'id' => $this->id,
             'name' => $this->name,
             'code' => $this->code,
-            'avatar' => $this->avatar ? asset(Storage::url($this->avatar)) : null,
+            'avatar' => $this->avatar ? asset(Storage::disk($disk)->url($this->avatar)) : null,
             'description' => $this->description,
             'is_active' => $this->is_active,
             'competition' => [
@@ -30,7 +32,7 @@ class LeagueResource extends JsonResource
             'owner' => [
                 'id' => $this->owner->id,
                 'name' => $this->owner->name,
-                'photo_url' => $this->owner->photo_url ? asset(Storage::url($this->owner->photo_url)) : null,
+                'photo_url' => $this->owner->photo_url ? asset(Storage::disk($disk)->url($this->owner->photo_url)) : null,
             ],
             'members_count' => $this->members_count ?? $this->members()->count(),
             'my_points' => $this->whenPivotLoaded('league_user', function () {

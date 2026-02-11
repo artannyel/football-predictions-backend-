@@ -76,6 +76,7 @@ class LeagueController extends Controller
     public function ranking(string $id): JsonResponse
     {
         $league = League::findOrFail($id);
+        $disk = config('filesystems.default');
 
         $members = $league->members()
             ->orderByPivot('points', 'desc')
@@ -88,12 +89,12 @@ class LeagueController extends Controller
 
         return response()->json([
             'league_name' => $league->name,
-            'data' => $members->map(function ($member, $index) use ($members) {
+            'data' => $members->map(function ($member, $index) use ($members, $disk) {
                 return [
                     'rank' => ($members->currentPage() - 1) * $members->perPage() + $index + 1,
                     'user_id' => $member->id,
                     'name' => $member->name,
-                    'photo_url' => $member->photo_url ? asset(Storage::disk('public')->url($member->photo_url)) : null,
+                    'photo_url' => $member->photo_url ? asset(Storage::disk($disk)->url($member->photo_url)) : null,
                     'points' => $member->pivot->points,
                     'stats' => [
                         'exact_score' => $member->pivot->exact_score_count,
@@ -115,7 +116,6 @@ class LeagueController extends Controller
 
     public function upcomingMatches(Request $request, string $id, ListUpcomingCompetitionMatchesAction $action): JsonResponse
     {
-        // $id aqui é o ID da Liga
         $matches = $action->execute($id, $request->user()->id);
 
         return response()->json([

@@ -13,7 +13,6 @@ class UpdateLeagueAction
 {
     public function execute(User $user, League $league, array $data): League
     {
-        // Verifica se o usuário é o dono
         if ($user->id !== $league->owner_id) {
             throw new AuthorizationException('Only the owner can edit this league.');
         }
@@ -23,14 +22,13 @@ class UpdateLeagueAction
             'description' => $data['description'] ?? $league->description,
         ];
 
-        // Processamento do Avatar
         if (isset($data['avatar']) && $data['avatar'] instanceof UploadedFile) {
-            // 1. Deleta o avatar antigo se existir
-            if ($league->avatar && Storage::disk('public')->exists($league->avatar)) {
-                Storage::disk('public')->delete($league->avatar);
+            $disk = config('filesystems.default');
+
+            if ($league->avatar && Storage::disk($disk)->exists($league->avatar)) {
+                Storage::disk($disk)->delete($league->avatar);
             }
 
-            // 2. Processa e salva o novo
             $filename = $data['avatar']->hashName();
             $path = 'leagues/' . $filename;
 
@@ -38,7 +36,7 @@ class UpdateLeagueAction
                 ->cover(500, 500)
                 ->toJpeg(80);
 
-            Storage::disk('public')->put($path, (string) $image);
+            Storage::disk($disk)->put($path, (string) $image, 'public');
 
             $updateData['avatar'] = $path;
         }
