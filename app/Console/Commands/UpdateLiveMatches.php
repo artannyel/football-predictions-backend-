@@ -104,6 +104,7 @@ class UpdateLiveMatches extends Command
                 // Verifica se houve mudança relevante para salvar
                 if ($match->isDirty()) {
                     $match->save();
+                    $this->info("Updated match {$match->external_id}");
 
                     // Se o jogo acabou AGORA (mudou para FINISHED nesta atualização), processa os pontos
                     if ($match->wasChanged('status') && $match->status === 'FINISHED') {
