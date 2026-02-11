@@ -13,7 +13,8 @@ RUN apt-get update && apt-get install -y \
     supervisor \
     libpq-dev \
     libjpeg62-turbo-dev \
-    libfreetype6-dev
+    libfreetype6-dev \
+    dos2unix
 
 # Clear cache
 RUN apt-get clean && rm -rf /var/lib/apt/lists/*
@@ -38,6 +39,13 @@ RUN composer install --no-interaction --optimize-autoloader --no-dev
 COPY docker/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 COPY docker/nginx.conf /etc/nginx/sites-available/default
 COPY docker/start.sh /usr/local/bin/start.sh
+
+# Fix line endings (CRLF -> LF) for Windows users
+RUN dos2unix /usr/local/bin/start.sh
+RUN dos2unix /etc/supervisor/conf.d/supervisord.conf
+
+# Create log directories for supervisor
+RUN mkdir -p /var/log/supervisor
 
 # Permissions
 RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache
