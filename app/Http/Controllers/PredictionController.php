@@ -7,6 +7,7 @@ use App\Actions\ListUpcomingPredictionsAction;
 use App\Actions\StorePredictionAction;
 use App\Http\Resources\PredictionResource;
 use App\Models\League;
+use App\Models\Prediction;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -71,7 +72,15 @@ class PredictionController extends Controller
 
     public function show(Request $request, string $id): JsonResponse
     {
-        $prediction = $request->user()->predictions()->with(['match.homeTeam', 'match.awayTeam'])->findOrFail($id);
+        $prediction = Prediction::with(['match.homeTeam', 'match.awayTeam'])->find($id);
+
+        if (!$prediction) {
+            return response()->json(['message' => __('messages.prediction.not_found')], 404);
+        }
+
+        if ($prediction->user_id !== $request->user()->id) {
+            return response()->json(['message' => __('messages.prediction.unauthorized')], 403);
+        }
 
         return response()->json([
             'data' => new PredictionResource($prediction),

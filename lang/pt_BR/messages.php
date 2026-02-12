@@ -25,5 +25,7 @@ return [
         'saved' => 'Palpite salvo com sucesso',
         'match_started' => 'A partida já começou. Palpites encerrados.',
         'invalid_match' => 'Esta partida não pertence à competição da liga.',
+        'not_found' => 'Palpite não encontrado.',
+        'unauthorized' => 'Você não tem permissão para visualizar este palpite.',
     ],
 ];
