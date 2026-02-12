@@ -21,7 +21,7 @@ class UserController extends Controller
         $user = $action->execute($dto);
 
         return response()->json([
-            'message' => 'User updated successfully',
+            'message' => __('messages.user.updated'),
             'data' => new UserResource($user),
         ]);
     }

@@ -14,7 +14,7 @@ class UpdateLeagueAction
     public function execute(User $user, League $league, array $data): League
     {
         if ($user->id !== $league->owner_id) {
-            throw new AuthorizationException('Only the owner can edit this league.');
+            throw new AuthorizationException(__('messages.league.owner_only'));
         }
 
         $updateData = [

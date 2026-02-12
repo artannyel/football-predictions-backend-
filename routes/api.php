@@ -22,7 +22,7 @@ Route::middleware(['auth.firebase'])->group(function () {
 
     Route::get('/user', function (Request $request) {
         return response()->json([
-            'message' => 'Autenticado com sucesso via Firebase!',
+            'message' => __('messages.auth.success'),
             'user' => new UserResource($request->user()),
         ]);
     });

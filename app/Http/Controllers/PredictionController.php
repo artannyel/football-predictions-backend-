@@ -25,7 +25,7 @@ class PredictionController extends Controller
         $prediction = $action->execute($request->user(), $validated);
 
         return response()->json([
-            'message' => 'Prediction saved successfully',
+            'message' => __('messages.prediction.saved'),
             'data' => new PredictionResource($prediction),
         ]);
     }
@@ -93,13 +93,13 @@ class PredictionController extends Controller
         $league = League::findOrFail($leagueId);
 
         if (!$league->members()->where('user_id', $currentUser->id)->exists()) {
-            return response()->json(['message' => 'You are not a member of this league.'], 403);
+            return response()->json(['message' => __('messages.league.not_member')], 403);
         }
 
         $targetMember = $league->members()->where('user_id', $userId)->first();
 
         if (!$targetMember) {
-            return response()->json(['message' => 'Target user is not a member of this league.'], 404);
+            return response()->json(['message' => __('messages.league.target_not_member')], 404);
         }
 
         $predictions = $action->execute($userId, $leagueId, $perPage);

@@ -14,17 +14,16 @@ class JoinLeagueAction
         $league = League::where('code', strtoupper($code))->first();
 
         if (!$league) {
-            throw new ModelNotFoundException("League with code {$code} not found.");
+            throw new ModelNotFoundException(__('messages.league.not_found', ['code' => $code]));
         }
 
         if (!$league->is_active) {
             throw ValidationException::withMessages([
-                'code' => 'This league is closed and cannot accept new members.',
+                'code' => __('messages.league.closed'),
             ]);
         }
 
         if ($league->members()->where('user_id', $user->id)->exists()) {
-            // Se já estiver na liga, apenas retorna a liga sem erro (idempotência)
             return $league;
         }
 

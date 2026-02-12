@@ -37,7 +37,7 @@ class LeagueController extends Controller
         $league = $action->execute($request->user(), $validated);
 
         return response()->json([
-            'message' => 'League created successfully',
+            'message' => __('messages.league.created'),
             'data' => new LeagueResource($league->load(['competition', 'owner'])),
         ], 201);
     }
@@ -59,7 +59,7 @@ class LeagueController extends Controller
         }
 
         return response()->json([
-            'message' => 'League updated successfully',
+            'message' => __('messages.league.updated'),
             'data' => new LeagueResource($updatedLeague->load(['competition', 'owner'])),
         ]);
     }
@@ -69,7 +69,7 @@ class LeagueController extends Controller
         $league = League::with(['competition', 'owner'])->findOrFail($id);
 
         if (!$league->members()->where('user_id', $request->user()->id)->exists()) {
-            return response()->json(['message' => 'You are not a member of this league.'], 403);
+            return response()->json(['message' => __('messages.league.not_member')], 403);
         }
 
         return response()->json([
@@ -82,7 +82,7 @@ class LeagueController extends Controller
         $league = League::findOrFail($id);
 
         if (!$league->members()->where('user_id', $request->user()->id)->exists()) {
-            return response()->json(['message' => 'You are not a member of this league.'], 403);
+            return response()->json(['message' => __('messages.league.not_member')], 403);
         }
 
         $disk = config('filesystems.default');
@@ -128,7 +128,7 @@ class LeagueController extends Controller
         $league = League::findOrFail($id);
 
         if (!$league->members()->where('user_id', $request->user()->id)->exists()) {
-            return response()->json(['message' => 'You are not a member of this league.'], 403);
+            return response()->json(['message' => __('messages.league.not_member')], 403);
         }
 
         $matches = $action->execute($id, $request->user()->id);
@@ -147,11 +147,13 @@ class LeagueController extends Controller
         try {
             $league = $action->execute($request->user(), $validated['code']);
         } catch (\Exception $e) {
+            // Se for ModelNotFoundException, a mensagem já vem traduzida se usarmos o helper, mas aqui vem da Action
+            // Vamos deixar a Action lançar a exceção com a mensagem traduzida
             return response()->json(['message' => $e->getMessage()], 404);
         }
 
         return response()->json([
-            'message' => 'Joined league successfully',
+            'message' => __('messages.league.joined'),
             'data' => new LeagueResource($league->load(['competition', 'owner'])),
         ]);
     }

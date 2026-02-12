@@ -28,13 +28,13 @@ class AuthenticateFirebaseToken
         $idToken = $request->bearerToken();
 
         if (!$idToken) {
-            return response()->json(['message' => 'Unauthorized: No token provided'], 401);
+            return response()->json(['message' => __('messages.auth.unauthorized')], 401);
         }
 
         try {
             $verifiedIdToken = $this->auth->verifyIdToken($idToken);
         } catch (\Exception $e) {
-            return response()->json(['message' => 'Unauthorized: Invalid token', 'error' => $e->getMessage()], 401);
+            return response()->json(['message' => __('messages.auth.invalid_token'), 'error' => $e->getMessage()], 401);
         }
 
         $uid = $verifiedIdToken->claims()->get('sub');
