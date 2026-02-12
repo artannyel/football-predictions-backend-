@@ -7,6 +7,7 @@ use App\Actions\ListCompetitionMatchesAction;
 use App\Actions\ListUpcomingCompetitionMatchesAction;
 use App\Http\Resources\CompetitionResource;
 use App\Http\Resources\MatchResource;
+use App\Models\Competition;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -23,18 +24,11 @@ class CompetitionController extends Controller
 
     public function matches(int $id, ListCompetitionMatchesAction $action): JsonResponse
     {
+        $competition = Competition::where('external_id', $id)->firstOrFail();
         $matches = $action->execute($id);
 
         return response()->json([
-            'data' => MatchResource::collection($matches),
-        ]);
-    }
-
-    public function upcomingMatches(Request $request, int $id, ListUpcomingCompetitionMatchesAction $action): JsonResponse
-    {
-        $matches = $action->execute($id, $request->user()->id);
-
-        return response()->json([
+            'competition' => new CompetitionResource($competition),
             'data' => MatchResource::collection($matches),
         ]);
     }
