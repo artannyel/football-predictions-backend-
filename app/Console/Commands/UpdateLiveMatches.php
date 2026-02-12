@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Jobs\DeactivateFinishedLeagues;
 use App\Jobs\ProcessMatchResults;
 use App\Models\FootballMatch;
 use App\Services\FootballDataService;
@@ -53,16 +54,27 @@ class UpdateLiveMatches extends Command
 
         $this->info("Updating live matches for competitions: " . $competitionsToUpdate->implode(', '));
 
+        $finishedCompetitions = [];
+
         foreach ($competitionsToUpdate as $competitionId) {
-            $this->updateCompetitionMatches($service, $competitionId);
+            $hasFinishedMatch = $this->updateCompetitionMatches($service, $competitionId);
+            if ($hasFinishedMatch) {
+                $finishedCompetitions[] = $competitionId;
+            }
             sleep(2);
+        }
+
+        // Dispara verificação de fechamento de liga para as competições afetadas
+        foreach (array_unique($finishedCompetitions) as $compId) {
+            DeactivateFinishedLeagues::dispatch($compId);
         }
     }
 
-    private function updateCompetitionMatches(FootballDataService $service, int $competitionId)
+    private function updateCompetitionMatches(FootballDataService $service, int $competitionId): bool
     {
+        $hasFinishedMatch = false;
+
         try {
-            // Busca jogos de ontem e hoje para cobrir jogos que viram a noite
             $today = now()->format('Y-m-d');
             $yesterday = now()->subDay()->format('Y-m-d');
 
@@ -72,7 +84,7 @@ class UpdateLiveMatches extends Command
             ]);
 
             if (!isset($response['matches'])) {
-                return;
+                return false;
             }
 
             foreach ($response['matches'] as $data) {
@@ -98,11 +110,18 @@ class UpdateLiveMatches extends Command
                         Log::info("Match {$match->external_id} updated. Dispatching processing job.");
                         ProcessMatchResults::dispatch($match->external_id);
                     }
+
+                    // Se o jogo acabou AGORA, marca para verificar fechamento da liga
+                    if ($match->wasChanged('status') && $match->status === 'FINISHED') {
+                        $hasFinishedMatch = true;
+                    }
                 }
             }
 
         } catch (\Exception $e) {
             Log::error("Failed to update live matches for competition {$competitionId}: " . $e->getMessage());
         }
+
+        return $hasFinishedMatch;
     }
 }
