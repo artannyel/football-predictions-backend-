@@ -35,7 +35,7 @@ class UpdateLiveMatches extends Command
             ->where(function ($query) {
                 $query->whereIn('status', ['IN_PLAY', 'PAUSED'])
                       ->orWhere(function ($q) {
-                          $q->where('status', 'SCHEDULED')
+                          $q->whereIn('status', ['SCHEDULED', 'TIMED'])
                             ->where('utc_date', '>=', now()->subHours(2))
                             ->where('utc_date', '<=', now()->addMinutes(30));
                       });
@@ -64,7 +64,6 @@ class UpdateLiveMatches extends Command
             sleep(2);
         }
 
-        // Dispara verificação de fechamento de liga para as competições afetadas
         foreach (array_unique($finishedCompetitions) as $compId) {
             DeactivateFinishedLeagues::dispatch($compId);
         }
@@ -111,7 +110,6 @@ class UpdateLiveMatches extends Command
                         ProcessMatchResults::dispatch($match->external_id);
                     }
 
-                    // Se o jogo acabou AGORA, marca para verificar fechamento da liga
                     if ($match->wasChanged('status') && $match->status === 'FINISHED') {
                         $hasFinishedMatch = true;
                     }
