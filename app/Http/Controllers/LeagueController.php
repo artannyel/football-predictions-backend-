@@ -64,18 +64,27 @@ class LeagueController extends Controller
         ]);
     }
 
-    public function show(string $id): JsonResponse
+    public function show(Request $request, string $id): JsonResponse
     {
         $league = League::with(['competition', 'owner'])->findOrFail($id);
+
+        if (!$league->members()->where('user_id', $request->user()->id)->exists()) {
+            return response()->json(['message' => 'You are not a member of this league.'], 403);
+        }
 
         return response()->json([
             'data' => new LeagueResource($league),
         ]);
     }
 
-    public function ranking(string $id): JsonResponse
+    public function ranking(Request $request, string $id): JsonResponse
     {
         $league = League::findOrFail($id);
+
+        if (!$league->members()->where('user_id', $request->user()->id)->exists()) {
+            return response()->json(['message' => 'You are not a member of this league.'], 403);
+        }
+
         $disk = config('filesystems.default');
 
         $members = $league->members()
@@ -116,6 +125,12 @@ class LeagueController extends Controller
 
     public function upcomingMatches(Request $request, string $id, ListUpcomingCompetitionMatchesAction $action): JsonResponse
     {
+        $league = League::findOrFail($id);
+
+        if (!$league->members()->where('user_id', $request->user()->id)->exists()) {
+            return response()->json(['message' => 'You are not a member of this league.'], 403);
+        }
+
         $matches = $action->execute($id, $request->user()->id);
 
         return response()->json([
