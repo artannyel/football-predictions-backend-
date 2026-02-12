@@ -17,5 +17,8 @@ Schedule::command('update:live-matches')->everyMinute();
 // Atualiza todos os jogos do dia a cada hora (garantia de consistência)
 Schedule::command('update:daily-matches')->hourly();
 
-// Sincronização completa diária (novos jogos, rodadas futuras)
+// Atualiza competições e temporadas (currentMatchday, datas) diariamente às 02:55
+Schedule::command('import:competitions')->dailyAt('02:55');
+
+// Sincronização completa de jogos (novos jogos, rodadas futuras) diariamente às 03:00
 Schedule::command('import:matches')->dailyAt('03:00');
