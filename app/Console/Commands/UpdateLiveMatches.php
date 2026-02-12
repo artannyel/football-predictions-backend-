@@ -62,18 +62,18 @@ class UpdateLiveMatches extends Command
     private function updateCompetitionMatches(FootballDataService $service, int $competitionId)
     {
         try {
+            // Busca jogos de ontem e hoje para cobrir jogos que viram a noite
             $today = now()->format('Y-m-d');
+            $yesterday = now()->subDay()->format('Y-m-d');
 
             $response = $service->getCompetitionMatches($competitionId, [
-                'dateFrom' => $today,
+                'dateFrom' => $yesterday,
                 'dateTo' => $today,
             ]);
 
             if (!isset($response['matches'])) {
                 return;
             }
-
-            $this->info('quantity matches '. count($response['matches']));
 
             foreach ($response['matches'] as $data) {
                 $match = FootballMatch::where('external_id', $data['id'])->first();
@@ -94,9 +94,7 @@ class UpdateLiveMatches extends Command
                 if ($match->isDirty()) {
                     $match->save();
 
-                    // Se mudou status ou placar, recalcula pontos em tempo real
                     if ($match->wasChanged(['status', 'score_fulltime_home', 'score_fulltime_away'])) {
-                        $this->info("Match {$match->external_id} updated. Dispatching processing job.");
                         Log::info("Match {$match->external_id} updated. Dispatching processing job.");
                         ProcessMatchResults::dispatch($match->external_id);
                     }
