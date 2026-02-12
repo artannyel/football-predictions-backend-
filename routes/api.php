@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\CompetitionController;
 use App\Http\Controllers\LeagueController;
+use App\Http\Controllers\MatchController;
 use App\Http\Controllers\PredictionController;
 use App\Http\Controllers\RulesController;
 use App\Http\Controllers\UserController;
@@ -32,6 +33,9 @@ Route::middleware(['auth.firebase'])->group(function () {
     // Competitions
     Route::get('/competitions', [CompetitionController::class, 'index']);
     Route::get('/competitions/{id}/matches', [CompetitionController::class, 'matches']);
+
+    // Matches
+    Route::get('/matches/{id}', [MatchController::class, 'show']);
 
     // Leagues
     Route::get('/leagues', [LeagueController::class, 'index']);
