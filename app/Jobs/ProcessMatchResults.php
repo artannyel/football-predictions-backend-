@@ -26,9 +26,6 @@ class ProcessMatchResults implements ShouldQueue
             return;
         }
 
-        // Removemos a trava de status. Calculamos sempre que chamado.
-        // Se o jogo não tiver placar, a Action retorna 0/PENDING.
-
         $predictions = Prediction::where('match_id', $match->external_id)->get();
 
         foreach ($predictions as $prediction) {
@@ -47,8 +44,18 @@ class ProcessMatchResults implements ShouldQueue
             $prediction->result_type = $newType;
             $prediction->save();
 
-            // Atualiza estatísticas APENAS na liga específica do palpite
             $this->updateUserLeagueStats($prediction->user_id, $prediction->league_id, $oldPoints, $newPoints, $oldType, $newType);
+
+            // Envia notificação apenas se o jogo terminou e o usuário ganhou pontos
+            // E se houve mudança de pontos (para não notificar repetido se reprocessar)
+            if ($match->status === 'FINISHED' && $newPoints > 0) {
+                SendMatchResultNotification::dispatch(
+                    $prediction->user_id,
+                    $match->external_id,
+                    $newPoints,
+                    $newType
+                );
+            }
         }
     }
 
@@ -62,26 +69,15 @@ class ProcessMatchResults implements ShouldQueue
             'points' => DB::raw("points + ($newPoints - $oldPoints)"),
         ];
 
-        // Decrementa estatística antiga (se existia e era válida)
         if ($oldType && $oldType !== 'PENDING') {
             $col = $this->getTypeColumn($oldType);
             if ($col) $updates[$col] = DB::raw("$col - 1");
         } else {
-            // Se antes era PENDING ou null, agora conta como processado?
-            // Se o jogo ainda está rolando, tecnicamente é um palpite "ativo".
-            // Mas para estatísticas, vamos contar. Se mudar depois, a gente ajusta.
-            // O problema é: se o jogo está rolando, o total_predictions deve ser incrementado?
-            // Sim, pois o usuário já fez o palpite.
-            // Mas se rodarmos isso várias vezes, não podemos incrementar total_predictions repetidamente.
-            // A lógica "if ($oldType)" protege isso, pois na segunda vez oldType será algo como 'WINNER_ONLY'.
-
-            // Se oldType era null (primeira vez), incrementa total.
             if (is_null($oldType)) {
                 $updates['total_predictions'] = DB::raw("total_predictions + 1");
             }
         }
 
-        // Incrementa estatística nova
         if ($newType && $newType !== 'PENDING') {
             $col = $this->getTypeColumn($newType);
             if ($col) $updates[$col] = DB::raw("$col + 1");
