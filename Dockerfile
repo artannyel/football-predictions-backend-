@@ -14,7 +14,9 @@ RUN apt-get update && apt-get install -y \
     libpq-dev \
     libjpeg62-turbo-dev \
     libfreetype6-dev \
-    dos2unix
+    dos2unix \
+    autoconf \
+    zlib1g-dev
 
 # Clear cache
 RUN apt-get clean && rm -rf /var/lib/apt/lists/*

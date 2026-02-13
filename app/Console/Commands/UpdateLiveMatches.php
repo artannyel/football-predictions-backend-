@@ -6,6 +6,7 @@ use App\Jobs\DeactivateFinishedLeagues;
 use App\Jobs\ProcessMatchResults;
 use App\Models\FootballMatch;
 use App\Services\FootballDataService;
+use App\Services\FirestoreService;
 use Carbon\Carbon;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
@@ -29,7 +30,7 @@ class UpdateLiveMatches extends Command
     /**
      * Execute the console command.
      */
-    public function handle(FootballDataService $service)
+    public function handle(FootballDataService $service, FirestoreService $firestore)
     {
         $activeCompetitionIds = FootballMatch::query()
             ->where(function ($query) {
@@ -57,10 +58,22 @@ class UpdateLiveMatches extends Command
         $finishedCompetitions = [];
 
         foreach ($competitionsToUpdate as $competitionId) {
-            $hasFinishedMatch = $this->updateCompetitionMatches($service, $competitionId);
-            if ($hasFinishedMatch) {
+            $hasUpdates = $this->updateCompetitionMatches($service, $competitionId);
+
+            if ($hasUpdates['finished']) {
                 $finishedCompetitions[] = $competitionId;
             }
+
+            $this->info('Is changed: ' . (int) $hasUpdates['changed']);
+            // Se houve qualquer atualização relevante (gol, status), sinaliza no Firestore
+            if ($hasUpdates['changed']) {
+                $this->info('firestore');
+                $firestore->signalCompetitionUpdate($competitionId, [
+                    'trigger' => 'live_update',
+                    'matches_affected' => $hasUpdates['count']
+                ]);
+            }
+
             sleep(2);
         }
 
@@ -69,9 +82,12 @@ class UpdateLiveMatches extends Command
         }
     }
 
-    private function updateCompetitionMatches(FootballDataService $service, int $competitionId): bool
+    /**
+     * Retorna array ['changed' => bool, 'finished' => bool, 'count' => int]
+     */
+    private function updateCompetitionMatches(FootballDataService $service, int $competitionId): array
     {
-        $hasFinishedMatch = false;
+        $result = ['changed' => false, 'finished' => false, 'count' => 0];
 
         try {
             $today = now()->format('Y-m-d');
@@ -83,7 +99,7 @@ class UpdateLiveMatches extends Command
             ]);
 
             if (!isset($response['matches'])) {
-                return false;
+                return $result;
             }
 
             foreach ($response['matches'] as $data) {
@@ -105,13 +121,17 @@ class UpdateLiveMatches extends Command
                 if ($match->isDirty()) {
                     $match->save();
 
+                    // Verifica mudanças relevantes para sinalização
                     if ($match->wasChanged(['status', 'score_fulltime_home', 'score_fulltime_away'])) {
                         Log::info("Match {$match->external_id} updated. Dispatching processing job.");
                         ProcessMatchResults::dispatch($match->external_id);
+
+                        $result['changed'] = true;
+                        $result['count']++;
                     }
 
                     if ($match->wasChanged('status') && $match->status === 'FINISHED') {
-                        $hasFinishedMatch = true;
+                        $result['finished'] = true;
                     }
                 }
             }
@@ -120,6 +140,6 @@ class UpdateLiveMatches extends Command
             Log::error("Failed to update live matches for competition {$competitionId}: " . $e->getMessage());
         }
 
-        return $hasFinishedMatch;
+        return $result;
     }
 }
