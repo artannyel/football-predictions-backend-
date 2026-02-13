@@ -11,6 +11,7 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class ProcessMatchResults implements ShouldQueue
 {
@@ -36,16 +37,6 @@ class ProcessMatchResults implements ShouldQueue
             $oldPoints = $prediction->points_earned ?? 0;
             $oldType = $prediction->result_type;
 
-            if ($newPoints === $oldPoints && $newType === $oldType) {
-                continue;
-            }
-
-            $prediction->points_earned = $newPoints;
-            $prediction->result_type = $newType;
-            $prediction->save();
-
-            $this->updateUserLeagueStats($prediction->user_id, $prediction->league_id, $oldPoints, $newPoints, $oldType, $newType);
-
             // Envia notificação apenas se o jogo terminou e o usuário ganhou pontos
             // E se houve mudança de pontos (para não notificar repetido se reprocessar)
             if ($match->status === 'FINISHED' && $newPoints > 0) {
@@ -56,6 +47,16 @@ class ProcessMatchResults implements ShouldQueue
                     $newType
                 );
             }
+
+            if ($newPoints === $oldPoints && $newType === $oldType) {
+                continue;
+            }
+
+            $prediction->points_earned = $newPoints;
+            $prediction->result_type = $newType;
+            $prediction->save();
+
+            $this->updateUserLeagueStats($prediction->user_id, $prediction->league_id, $oldPoints, $newPoints, $oldType, $newType);
         }
     }
 
