@@ -36,6 +36,7 @@ Route::middleware(['auth.firebase'])->group(function () {
 
     // Matches
     Route::get('/matches/{id}', [MatchController::class, 'show']);
+    Route::get('/matches/{id}/stats', [MatchController::class, 'stats']); // Nova rota
 
     // Leagues
     Route::get('/leagues', [LeagueController::class, 'index']);
