@@ -38,13 +38,13 @@ class ProcessMatchResults implements ShouldQueue
             $oldType = $prediction->result_type;
 
             // Envia notificação apenas se o jogo terminou e o usuário ganhou pontos
-            // E se houve mudança de pontos (para não notificar repetido se reprocessar)
             if ($match->status === 'FINISHED' && $newPoints > 0) {
                 SendMatchResultNotification::dispatch(
                     $prediction->user_id,
                     $match->external_id,
                     $newPoints,
-                    $newType
+                    $newType,
+                    $prediction->league_id
                 );
             }
 

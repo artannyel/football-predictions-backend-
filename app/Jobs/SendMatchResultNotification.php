@@ -19,12 +19,12 @@ class SendMatchResultNotification implements ShouldQueue
         protected string $userId,
         protected int $matchId,
         protected int $points,
-        protected string $resultType
+        protected string $resultType,
+        protected string $leagueId
     ) {}
 
     public function handle(OneSignalService $oneSignal): void
     {
-        // Se não ganhou pontos, não notifica (para não ser chato)
         if ($this->points <= 0) {
             return;
         }
@@ -39,11 +39,16 @@ class SendMatchResultNotification implements ShouldQueue
         $title = "Fim de jogo: {$home} x {$away}";
         $message = $this->getMessage($this->points, $this->resultType);
 
+        $frontendUrl = env('FRONTEND_URL');
+        $url = $frontendUrl ? "{$frontendUrl}/liga/{$this->leagueId}" : null;
+
         $oneSignal->sendToUsers([$this->userId], $title, $message, [
             'type' => 'match_result',
             'match_id' => $this->matchId,
-            'points' => $this->points
-        ]);
+            'points' => $this->points,
+            'league_id' => $this->leagueId,
+            'click_action' => 'FLUTTER_NOTIFICATION_CLICK',
+        ], $url);
     }
 
     private function getMessage(int $points, string $type): string

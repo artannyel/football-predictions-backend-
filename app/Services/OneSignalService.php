@@ -24,8 +24,9 @@ class OneSignalService
      * @param string $title Título da notificação
      * @param string $message Corpo da mensagem
      * @param array|null $data Dados adicionais (payload)
+     * @param string|null $url URL para abrir ao clicar (Web)
      */
-    public function sendToUsers(array $userIds, string $title, string $message, ?array $data = null): void
+    public function sendToUsers(array $userIds, string $title, string $message, ?array $data = null, ?string $url = null): void
     {
         if (empty($this->appId) || empty($this->apiKey)) {
             Log::warning('OneSignal credentials not configured.');
@@ -43,12 +44,16 @@ class OneSignalService
                     'external_id' => array_map('strval', $userIds)
                 ],
                 'target_channel' => 'push',
-                'headings' => ['en' => $title, 'pt' => $title], // Suporte básico a multi-idioma
+                'headings' => ['en' => $title, 'pt' => $title],
                 'contents' => ['en' => $message, 'pt' => $message],
                 'data' => $data,
             ];
 
-            $response = Http::withToken($this->apiKey, 'Basic') // OneSignal usa Basic Auth com a REST API Key
+            if ($url) {
+                $payload['url'] = $url;
+            }
+
+            $response = Http::withToken($this->apiKey, 'Basic')
                 ->post($this->apiUrl, $payload);
 
             if ($response->failed()) {
@@ -65,7 +70,7 @@ class OneSignalService
     /**
      * Envia notificação para todos os usuários (Broadcast).
      */
-    public function sendToAll(string $title, string $message, ?array $data = null): void
+    public function sendToAll(string $title, string $message, ?array $data = null, ?string $url = null): void
     {
         if (empty($this->appId) || empty($this->apiKey)) {
             return;
@@ -79,6 +84,10 @@ class OneSignalService
                 'contents' => ['en' => $message, 'pt' => $message],
                 'data' => $data,
             ];
+
+            if ($url) {
+                $payload['url'] = $url;
+            }
 
             Http::withToken($this->apiKey, 'Basic')->post($this->apiUrl, $payload);
 
