@@ -63,7 +63,7 @@ class User extends Authenticatable
                 'error_count',
                 'total_predictions'
             ])
-            ->orderBy('created_at')
+            ->orderBy('league_user.created_at')
             ->withTimestamps();
     }
 
