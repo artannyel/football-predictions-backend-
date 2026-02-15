@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Actions\CreateLeagueAction;
 use App\Actions\JoinLeagueAction;
 use App\Actions\ListUpcomingCompetitionMatchesAction;
+use App\Actions\ListUserLeaguesAction;
 use App\Actions\UpdateLeagueAction;
 use App\Http\Resources\LeagueResource;
 use App\Http\Resources\MatchResource;
@@ -16,13 +17,15 @@ use Illuminate\Validation\ValidationException;
 
 class LeagueController extends Controller
 {
-    public function index(Request $request): JsonResponse
+    public function index(Request $request, ListUserLeaguesAction $action): JsonResponse
     {
-        $leagues = $request->user()->leagues()->with(['competition', 'owner'])->get();
+        $filters = $request->only(['competition_id', 'name', 'status', 'per_page']);
 
-        return response()->json([
-            'data' => LeagueResource::collection($leagues),
-        ]);
+        $leagues = $action->execute($request->user(), $filters);
+
+        return response()->json(
+            LeagueResource::collection($leagues)->response()->getData(true)
+        );
     }
 
     public function store(Request $request, CreateLeagueAction $action): JsonResponse
@@ -147,8 +150,6 @@ class LeagueController extends Controller
         try {
             $league = $action->execute($request->user(), $validated['code']);
         } catch (\Exception $e) {
-            // Se for ModelNotFoundException, a mensagem já vem traduzida se usarmos o helper, mas aqui vem da Action
-            // Vamos deixar a Action lançar a exceção com a mensagem traduzida
             return response()->json(['message' => $e->getMessage()], 404);
         }
 
