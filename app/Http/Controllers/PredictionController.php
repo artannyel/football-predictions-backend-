@@ -5,12 +5,12 @@ namespace App\Http\Controllers;
 use App\Actions\ListOtherUserPredictionsAction;
 use App\Actions\ListUpcomingPredictionsAction;
 use App\Actions\StorePredictionAction;
+use App\Http\Resources\LeagueMemberResource;
 use App\Http\Resources\PredictionResource;
 use App\Models\League;
 use App\Models\Prediction;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
 
 class PredictionController extends Controller
 {
@@ -97,38 +97,30 @@ class PredictionController extends Controller
         $leagueId = $request->query('league_id');
         $perPage = $request->query('per_page', 20);
         $currentUser = $request->user();
-        $disk = config('filesystems.default');
 
         $league = League::findOrFail($leagueId);
 
-        if (!$league->members()->where('user_id', $currentUser->id)->exists()) {
+        // Busca dados do usuário logado na liga (ME)
+        $currentMember = $league->members()->where('user_id', $currentUser->id)->first();
+
+        if (!$currentMember) {
             return response()->json(['message' => __('messages.league.not_member')], 403);
         }
 
+        // Busca dados do usuário alvo na liga (USER)
         $targetMember = $league->members()->where('user_id', $userId)->first();
 
         if (!$targetMember) {
             return response()->json(['message' => __('messages.league.target_not_member')], 404);
         }
 
-        $predictions = $action->execute($userId, $leagueId, $perPage);
+        // Busca palpites com comparação
+        $predictions = $action->execute($userId, $leagueId, $currentUser->id, $perPage);
         $paginatedData = PredictionResource::collection($predictions)->response()->getData(true);
 
         return response()->json([
-            'user' => [
-                'id' => $targetMember->id,
-                'name' => $targetMember->name,
-                'photo_url' => $targetMember->photo_url ? asset(Storage::disk($disk)->url($targetMember->photo_url)) : null,
-                'stats' => [
-                    'points' => $targetMember->pivot->points,
-                    'exact_score' => $targetMember->pivot->exact_score_count,
-                    'winner_diff' => $targetMember->pivot->winner_diff_count,
-                    'winner_goal' => $targetMember->pivot->winner_goal_count,
-                    'winner_only' => $targetMember->pivot->winner_only_count,
-                    'errors' => $targetMember->pivot->error_count,
-                    'total' => $targetMember->pivot->total_predictions,
-                ]
-            ],
+            'me' => new LeagueMemberResource($currentMember),
+            'user' => new LeagueMemberResource($targetMember),
             'predictions' => $paginatedData
         ]);
     }

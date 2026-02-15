@@ -20,8 +20,18 @@ class PredictionResource extends JsonResource
             'home_score' => $this->home_score,
             'away_score' => $this->away_score,
             'points_earned' => $this->points_earned,
+            'result_type' => $this->result_type, // Adicionei result_type que faltava
             'created_at' => $this->created_at,
             'match' => new MatchResource($this->whenLoaded('match')),
+            'my_prediction' => $this->when(isset($this->my_prediction), function () {
+                return $this->my_prediction ? [
+                    'id' => $this->my_prediction->id,
+                    'home_score' => $this->my_prediction->home_score,
+                    'away_score' => $this->my_prediction->away_score,
+                    'points_earned' => $this->my_prediction->points_earned,
+                    'result_type' => $this->my_prediction->result_type,
+                ] : null;
+            }),
         ];
     }
 }
