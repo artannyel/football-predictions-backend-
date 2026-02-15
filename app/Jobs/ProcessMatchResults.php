@@ -3,15 +3,16 @@
 namespace App\Jobs;
 
 use App\Actions\CalculatePredictionPointsAction;
+use App\Actions\GetMatchPredictionStatsAction;
 use App\Models\FootballMatch;
 use App\Models\Prediction;
+use App\Services\BadgeService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
 
 class ProcessMatchResults implements ShouldQueue
 {
@@ -19,12 +20,23 @@ class ProcessMatchResults implements ShouldQueue
 
     public function __construct(protected int $matchExternalId) {}
 
-    public function handle(CalculatePredictionPointsAction $calculator): void
+    public function handle(
+        CalculatePredictionPointsAction $calculator,
+        BadgeService $badgeService,
+        GetMatchPredictionStatsAction $statsAction
+    ): void
     {
         $match = FootballMatch::where('external_id', $this->matchExternalId)->first();
 
         if (!$match) {
             return;
+        }
+
+        // Calcula estatísticas do jogo para usar na regra da Zebra
+        // Só faz sentido se o jogo terminou
+        $matchStats = [];
+        if ($match->status === 'FINISHED') {
+            $matchStats = $statsAction->execute($match->external_id);
         }
 
         $predictions = Prediction::where('match_id', $match->external_id)->get();
@@ -37,23 +49,30 @@ class ProcessMatchResults implements ShouldQueue
             $oldPoints = $prediction->points_earned ?? 0;
             $oldType = $prediction->result_type;
 
-            // Envia notificação apenas se o jogo terminou e o usuário ganhou pontos
-            if ($match->status === 'FINISHED' && $newPoints > 0) {
+            $prediction->points_earned = $newPoints;
+            $prediction->result_type = $newType;
+
+            $badgeResult = ['awarded' => [], 'revoked' => []];
+            if ($match->status === 'FINISHED') {
+                $badgeResult = $badgeService->syncBadges($prediction, $match, $matchStats);
+            }
+
+            if ($match->status === 'FINISHED' && ($newPoints > 0 || !empty($badgeResult['awarded']) || !empty($badgeResult['revoked']))) {
                 SendMatchResultNotification::dispatch(
                     $prediction->user_id,
                     $match->external_id,
                     $newPoints,
                     $newType,
-                    $prediction->league_id
+                    $prediction->league_id,
+                    $badgeResult['awarded'],
+                    $badgeResult['revoked']
                 );
             }
 
-            if ($newPoints === $oldPoints && $newType === $oldType) {
+            if ($newPoints === $oldPoints && $newType === $oldType && empty($badgeResult['awarded']) && empty($badgeResult['revoked'])) {
                 continue;
             }
 
-            $prediction->points_earned = $newPoints;
-            $prediction->result_type = $newType;
             $prediction->save();
 
             $this->updateUserLeagueStats($prediction->user_id, $prediction->league_id, $oldPoints, $newPoints, $oldType, $newType);

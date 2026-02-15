@@ -9,6 +9,10 @@ echo "Starting deployment..."
 echo "Running migrations..."
 php artisan migrate --force
 
+# Run seeds (Badges)
+echo "Seeding database..."
+php artisan db:seed --class=BadgeSeeder --force
+
 # Cache config and routes
 echo "Caching configuration..."
 php artisan config:cache

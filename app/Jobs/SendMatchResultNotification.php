@@ -20,12 +20,15 @@ class SendMatchResultNotification implements ShouldQueue
         protected int $matchId,
         protected int $points,
         protected string $resultType,
-        protected string $leagueId
+        protected string $leagueId,
+        protected array $newBadges = [],
+        protected array $revokedBadges = [] // Novo parâmetro
     ) {}
 
     public function handle(OneSignalService $oneSignal): void
     {
-        if ($this->points <= 0) {
+        // Se não ganhou pontos e não houve mudança de medalhas, não notifica
+        if ($this->points <= 0 && empty($this->newBadges) && empty($this->revokedBadges)) {
             return;
         }
 
@@ -39,8 +42,20 @@ class SendMatchResultNotification implements ShouldQueue
         $title = "Fim de jogo: {$home} x {$away}";
         $message = $this->getMessage($this->points, $this->resultType);
 
+        // Adiciona mensagem de medalha ganha
+        if (!empty($this->newBadges)) {
+            $badgeNames = array_map(fn($b) => $b->name, $this->newBadges);
+            $message .= "\n🏅 Conquista: " . implode(', ', $badgeNames) . "!";
+        }
+
+        // Adiciona mensagem de medalha revogada
+        if (!empty($this->revokedBadges)) {
+            $badgeNames = array_map(fn($b) => $b->name, $this->revokedBadges);
+            $message .= "\n⚠️ Correção: A medalha " . implode(', ', $badgeNames) . " foi removida devido à mudança no placar.";
+        }
+
         $frontendUrl = env('FRONTEND_URL');
-        $url = $frontendUrl ? "{$frontendUrl}/liga/{$this->leagueId}" : null;
+        $url = $frontendUrl ? "{$frontendUrl}/leagues/{$this->leagueId}" : null;
 
         $oneSignal->sendToUsers([$this->userId], $title, $message, [
             'type' => 'match_result',
@@ -48,6 +63,8 @@ class SendMatchResultNotification implements ShouldQueue
             'points' => $this->points,
             'league_id' => $this->leagueId,
             'click_action' => 'FLUTTER_NOTIFICATION_CLICK',
+            'badges_awarded' => array_map(fn($b) => $b->slug, $this->newBadges),
+            'badges_revoked' => array_map(fn($b) => $b->slug, $this->revokedBadges),
         ], $url);
     }
 
