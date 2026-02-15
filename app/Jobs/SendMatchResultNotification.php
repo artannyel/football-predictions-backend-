@@ -55,7 +55,7 @@ class SendMatchResultNotification implements ShouldQueue
         }
 
         $frontendUrl = env('FRONTEND_URL');
-        $url = $frontendUrl ? "{$frontendUrl}/leagues/{$this->leagueId}" : null;
+        $url = $frontendUrl ? "{$frontendUrl}/liga/{$this->leagueId}" : null;
 
         $oneSignal->sendToUsers([$this->userId], $title, $message, [
             'type' => 'match_result',
