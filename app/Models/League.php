@@ -21,6 +21,9 @@ class League extends Model
         'avatar',
         'description',
         'is_active',
+        'champion_id',
+        'runner_up_id',
+        'third_place_id',
     ];
 
     public static function generateCode(): string
