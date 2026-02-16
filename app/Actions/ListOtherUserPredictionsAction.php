@@ -2,6 +2,8 @@
 
 namespace App\Actions;
 
+use App\Models\FootballMatch;
+use App\Models\League;
 use App\Models\Prediction;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 
@@ -9,30 +11,64 @@ class ListOtherUserPredictionsAction
 {
     public function execute(string $targetUserId, string $leagueId, string $currentUserId, int $perPage = 20): LengthAwarePaginator
     {
-        $paginator = Prediction::select('predictions.*')
-            ->join('matches', 'predictions.match_id', '=', 'matches.external_id')
-            ->where('predictions.user_id', $targetUserId)
-            ->where('predictions.league_id', $leagueId)
-            ->where('matches.utc_date', '<=', now()) // Apenas jogos que já começaram
-            ->with(['match.homeTeam', 'match.awayTeam'])
-            ->orderBy('matches.utc_date', 'desc')
+        $league = League::findOrFail($leagueId);
+
+        // Busca jogos da competição que já aconteceram E que são posteriores à criação da liga
+        $paginator = FootballMatch::where('competition_id', $league->competition_id)
+            ->where('utc_date', '<=', now())
+            ->where('utc_date', '>=', $league->created_at)
+            ->with(['homeTeam', 'awayTeam'])
+            ->orderBy('utc_date', 'desc')
             ->paginate($perPage);
 
-        $matchIds = $paginator->getCollection()->pluck('match_id')->toArray();
+        $matchIds = $paginator->getCollection()->pluck('external_id')->toArray();
 
         if (empty($matchIds)) {
             return $paginator;
         }
 
+        // Busca palpites do Target
+        $targetPredictions = Prediction::where('user_id', $targetUserId)
+            ->where('league_id', $leagueId)
+            ->whereIn('match_id', $matchIds)
+            ->get()
+            ->keyBy('match_id');
+
+        // Busca palpites do Current User
         $myPredictions = Prediction::where('user_id', $currentUserId)
             ->where('league_id', $leagueId)
             ->whereIn('match_id', $matchIds)
             ->get()
             ->keyBy('match_id');
 
-        $paginator->getCollection()->transform(function ($prediction) use ($myPredictions) {
-            $prediction->my_prediction = $myPredictions->get($prediction->match_id);
-            return $prediction;
+        $paginator->getCollection()->transform(function ($match) use ($targetPredictions, $myPredictions) {
+            $targetPred = $targetPredictions->get($match->external_id);
+            $myPred = $myPredictions->get($match->external_id);
+
+            // Se o target tem palpite, usamos ele como base (mantém compatibilidade)
+            if ($targetPred) {
+                $targetPred->setRelation('match', $match); // Injeta o match carregado
+                $targetPred->my_prediction = $myPred;
+                return $targetPred;
+            }
+
+            // Se o target NÃO tem palpite, criamos um objeto Prediction "fake" ou vazio
+            // para que o Resource consiga renderizar o jogo e mostrar "Não palpitou".
+
+            $fakePrediction = new Prediction([
+                'id' => null,
+                'match_id' => $match->external_id,
+                'home_score' => null,
+                'away_score' => null,
+                'points_earned' => null,
+                'result_type' => null,
+                'created_at' => null,
+            ]);
+
+            $fakePrediction->setRelation('match', $match);
+            $fakePrediction->my_prediction = $myPred;
+
+            return $fakePrediction;
         });
 
         return $paginator;
