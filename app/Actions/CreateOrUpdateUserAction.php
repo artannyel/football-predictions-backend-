@@ -22,15 +22,18 @@ class CreateOrUpdateUserAction
             $disk = config('filesystems.default');
 
             if ($user && $user->photo_url) {
-                Storage::disk($disk)->delete($user->photo_url);
+                if (Storage::disk($disk)->exists($user->photo_url)) {
+                    Storage::disk($disk)->delete($user->photo_url);
+                }
             }
 
-            $filename = $dto->photo->hashName();
+            // Muda extensão para .webp
+            $filename = pathinfo($dto->photo->hashName(), PATHINFO_FILENAME) . '.webp';
             $path = 'users/' . $filename;
 
             $image = Image::read($dto->photo)
-                ->cover(300, 300)
-                ->toJpeg(80);
+                ->cover(500, 500)
+                ->toWebp(80);
 
             Storage::disk($disk)->put($path, (string) $image, 'public');
 

@@ -29,12 +29,12 @@ class UpdateLeagueAction
                 Storage::disk($disk)->delete($league->avatar);
             }
 
-            $filename = $data['avatar']->hashName();
+            $filename = pathinfo($data['avatar']->hashName(), PATHINFO_FILENAME) . '.webp';
             $path = 'leagues/' . $filename;
 
             $image = Image::read($data['avatar'])
                 ->cover(500, 500)
-                ->toJpeg(80);
+                ->toWebp(80);
 
             Storage::disk($disk)->put($path, (string) $image, 'public');
 

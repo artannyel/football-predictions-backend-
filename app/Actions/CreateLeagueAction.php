@@ -15,13 +15,13 @@ class CreateLeagueAction
         $avatarPath = null;
 
         if (isset($data['avatar']) && $data['avatar'] instanceof UploadedFile) {
-            $filename = $data['avatar']->hashName();
+            $filename = pathinfo($data['avatar']->hashName(), PATHINFO_FILENAME) . '.webp';
             $path = 'leagues/' . $filename;
 
-            // Redimensiona para 500x500 (cover) e converte para JPG com 80% de qualidade
+            // Redimensiona para 500x500 (cover) e converte para WebP com 80% de qualidade
             $image = Image::read($data['avatar'])
                 ->cover(500, 500)
-                ->toJpeg(80);
+                ->toWebp(80);
 
             // Usa o disco configurado no .env (public localmente, s3 em produção)
             Storage::disk(config('filesystems.default'))->put($path, (string) $image, 'public');

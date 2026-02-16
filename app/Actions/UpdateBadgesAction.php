@@ -35,16 +35,17 @@ class UpdateBadgesAction
                     Storage::disk($disk)->delete($badge->icon);
                 }
 
-                $filename = $item['slug'] . '_' . time() . '.png'; // Usa slug para nomear
+                // Muda extensão para .webp
+                $filename = $item['slug'] . '_' . time() . '.webp';
                 $path = 'badges/' . $filename;
 
-                // Redimensiona e converte para PNG (transparência)
+                // Redimensiona e converte para WebP (qualidade 80)
                 $image = Image::read($item['icon_file'])
-                    ->resize(200, 200, function ($constraint) {
+                    ->resize(500, 500, function ($constraint) {
                         $constraint->aspectRatio();
                         $constraint->upsize();
                     })
-                    ->toPng();
+                    ->toWebp(80);
 
                 Storage::disk($disk)->put($path, (string) $image, 'public');
 
