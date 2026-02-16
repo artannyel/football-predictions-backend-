@@ -19,6 +19,13 @@ Route::get('/ping', function () {
     ]);
 });
 
+// Admin Routes (Protected by X-Admin-Key)
+Route::middleware(['auth.admin'])->prefix('admin')->group(function () {
+    Route::post('/recalculate-stats', [AdminController::class, 'recalculateStats']);
+    Route::post('/recalculate-badges', [AdminController::class, 'recalculateBadges']);
+    Route::post('/badges', [AdminController::class, 'updateBadges']);
+});
+
 Route::middleware(['auth.firebase'])->group(function () {
 
     Route::get('/user', function (Request $request) {
