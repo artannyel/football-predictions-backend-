@@ -40,9 +40,9 @@ class GetUserProfileStatsAction
         ];
 
         if ($totalHits > 0) {
-            $radar['precision'] = round(($globalStats->exact_score_count / $totalHits) * 100);
-            $radar['technique'] = round((($globalStats->winner_diff_count + $globalStats->winner_goal_count) / $totalHits) * 100);
-            $radar['safety'] = round(($globalStats->winner_only_count / $totalHits) * 100);
+            $radar['precision'] = round(($globalStats->exact_score_count / $totalHits) * 100, 2);
+            $radar['technique'] = round((($globalStats->winner_diff_count + $globalStats->winner_goal_count) / $totalHits) * 100, 2);
+            $radar['safety'] = round(($globalStats->winner_only_count / $totalHits) * 100, 2);
         }
 
         // 2. Histórico Recente
