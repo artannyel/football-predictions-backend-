@@ -33,7 +33,7 @@ class AdminController extends Controller
             'badges.*.slug' => 'required|string|exists:badges,slug',
             'badges.*.name' => 'nullable|string',
             'badges.*.description' => 'nullable|string',
-            'badges.*.icon_file' => 'nullable|image|max:2048', // 2MB
+            'badges.*.icon_file' => 'nullable|image|max:10240',
         ]);
 
         // Processa upload de arquivos
