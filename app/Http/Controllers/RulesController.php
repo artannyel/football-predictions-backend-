@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Resources\BadgeResource;
+use App\Models\Badge;
 use Illuminate\Http\JsonResponse;
 
 class RulesController extends Controller
@@ -72,7 +74,8 @@ class RulesController extends Controller
                     'title' => 'Menor Número de Erros',
                     'description' => 'Quem errou menos palpites vence. Premia a eficiência.'
                 ]
-            ]
+            ],
+            'badges' => BadgeResource::collection(Badge::all())
         ]);
     }
 }

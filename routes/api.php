@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AdminController;
 use App\Http\Controllers\CompetitionController;
 use App\Http\Controllers\LeagueController;
 use App\Http\Controllers\MatchController;
@@ -31,7 +32,7 @@ Route::middleware(['auth.firebase'])->group(function () {
     Route::get('/user', function (Request $request) {
         return response()->json([
             'message' => __('messages.auth.success'),
-            'user' => new UserResource($request->user()),
+            'user' => new UserResource($request->user()->load('badges')), // Carrega badges
         ]);
     });
 
@@ -43,7 +44,7 @@ Route::middleware(['auth.firebase'])->group(function () {
 
     // Matches
     Route::get('/matches/{id}', [MatchController::class, 'show']);
-    Route::get('/matches/{id}/stats', [MatchController::class, 'stats']); // Nova rota
+    Route::get('/matches/{id}/stats', [MatchController::class, 'stats']);
 
     // Leagues
     Route::get('/leagues', [LeagueController::class, 'index']);

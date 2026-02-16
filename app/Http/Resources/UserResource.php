@@ -19,11 +19,22 @@ class UserResource extends JsonResource
 
         return [
             'id' => $this->id,
-            'firebase_uid' => $this->firebase_uid,
             'name' => $this->name,
             'email' => $this->email,
             'photo_url' => $this->photo_url ? asset(Storage::disk($disk)->url($this->photo_url)) : null,
             'created_at' => $this->created_at,
+            'badges' => $this->whenLoaded('badges', function () use ($disk) {
+                return $this->badges->groupBy('slug')->map(function ($group) use ($disk) {
+                    $badge = $group->first();
+                    return [
+                        'slug' => $badge->slug,
+                        'name' => $badge->name,
+                        'description' => $badge->description,
+                        'icon_url' => $badge->icon ? asset(Storage::disk($disk)->url($badge->icon)) : null,
+                        'count' => $group->count(),
+                    ];
+                })->values();
+            }),
         ];
     }
 }

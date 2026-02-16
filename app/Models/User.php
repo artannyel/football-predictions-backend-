@@ -71,4 +71,11 @@ class User extends Authenticatable
     {
         return $this->hasMany(Prediction::class);
     }
+
+    public function badges(): BelongsToMany
+    {
+        return $this->belongsToMany(Badge::class, 'user_badges')
+            ->withPivot(['league_id', 'match_id', 'created_at'])
+            ->withTimestamps();
+    }
 }
