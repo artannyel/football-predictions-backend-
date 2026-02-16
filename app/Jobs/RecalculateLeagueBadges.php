@@ -12,6 +12,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class RecalculateLeagueBadges implements ShouldQueue
@@ -30,6 +31,7 @@ class RecalculateLeagueBadges implements ShouldQueue
 
         Log::channel('recalculation')->info("Recalculating badges for League {$league->id} ({$league->name})...");
 
+        // 1. Processar medalhas de jogo (Sniper, Zebra, Ousado)
         $matches = FootballMatch::where('competition_id', $league->competition_id)
             ->where('status', 'FINISHED')
             ->get();
@@ -44,6 +46,17 @@ class RecalculateLeagueBadges implements ShouldQueue
             if ($predictions->isEmpty()) continue;
 
             $badgeService->syncBadgesBatch($predictions, $match, $matchStats);
+        }
+
+        // 2. Processar medalhas de marco (Milestones) em lote
+        // Busca todos os membros e seus pontos atuais
+        $members = DB::table('league_user')
+            ->where('league_id', $league->id)
+            ->select('user_id', 'points')
+            ->get();
+
+        if ($members->isNotEmpty()) {
+            $badgeService->syncMilestoneBadgesBatch($members, $league->id);
         }
 
         Log::channel('recalculation')->info("League {$league->id} badges recalculated.");

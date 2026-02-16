@@ -55,25 +55,43 @@ class ProcessMatchResults implements ShouldQueue
                 $badgeResult = $badgeService->syncBadges($prediction, $match, $matchStats);
             }
 
-            if ($match->status === 'FINISHED' && ($newPoints > 0 || !empty($badgeResult['awarded']) || !empty($badgeResult['revoked']))) {
+            // Atualiza stats da liga
+            $this->updateUserLeagueStats($prediction->user_id, $prediction->league_id, $oldPoints, $newPoints, $oldType, $newType);
+
+            // Verifica marcos de pontuação (apenas se o jogo terminou)
+            $milestoneResult = ['awarded' => [], 'revoked' => []];
+            if ($match->status === 'FINISHED') {
+                $totalPoints = DB::table('league_user')
+                    ->where('user_id', $prediction->user_id)
+                    ->where('league_id', $prediction->league_id)
+                    ->value('points');
+
+                if ($totalPoints !== null) {
+                    $milestoneResult = $badgeService->checkMilestoneBadges($prediction->user_id, $prediction->league_id, $totalPoints);
+                }
+            }
+
+            // Combina medalhas ganhas e revogadas
+            $allAwarded = array_merge($badgeResult['awarded'], $milestoneResult['awarded']);
+            $allRevoked = array_merge($badgeResult['revoked'], $milestoneResult['revoked']);
+
+            if ($match->status === 'FINISHED' && ($newPoints > 0 || !empty($allAwarded) || !empty($allRevoked))) {
                 SendMatchResultNotification::dispatch(
                     $prediction->user_id,
                     $match->external_id,
                     $newPoints,
                     $newType,
                     $prediction->league_id,
-                    $badgeResult['awarded'],
-                    $badgeResult['revoked']
+                    $allAwarded,
+                    $allRevoked
                 );
             }
 
-            if ($newPoints === $oldPoints && $newType === $oldType && empty($badgeResult['awarded']) && empty($badgeResult['revoked'])) {
+            if ($newPoints === $oldPoints && $newType === $oldType && empty($allAwarded) && empty($allRevoked)) {
                 continue;
             }
 
             $prediction->save();
-
-            $this->updateUserLeagueStats($prediction->user_id, $prediction->league_id, $oldPoints, $newPoints, $oldType, $newType);
         }
     }
 
@@ -85,25 +103,20 @@ class ProcessMatchResults implements ShouldQueue
 
         $updates = [];
 
-        // Só atualiza pontos se mudou
         if ($newPoints !== $oldPoints) {
             $updates['points'] = DB::raw("points + ($newPoints - $oldPoints)");
         }
 
-        // Só atualiza contadores se o tipo mudou
         if ($newType !== $oldType) {
-            // Decrementa antigo
             if ($oldType && $oldType !== 'PENDING') {
                 $col = $this->getTypeColumn($oldType);
                 if ($col) $updates[$col] = DB::raw("$col - 1");
             } else {
-                // Se não tinha tipo antes (primeira vez), incrementa total
                 if (is_null($oldType)) {
                     $updates['total_predictions'] = DB::raw("total_predictions + 1");
                 }
             }
 
-            // Incrementa novo
             if ($newType && $newType !== 'PENDING') {
                 $col = $this->getTypeColumn($newType);
                 if ($col) $updates[$col] = DB::raw("$col + 1");

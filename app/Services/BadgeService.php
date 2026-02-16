@@ -55,10 +55,6 @@ class BadgeService
         return ['awarded' => $awarded, 'revoked' => $revoked];
     }
 
-    /**
-     * Processa medalhas em lote para múltiplos palpites de um mesmo jogo.
-     * Otimizado para reduzir queries.
-     */
     public function syncBadgesBatch(Collection $predictions, FootballMatch $match, array $matchStats = []): void
     {
         if ($predictions->isEmpty()) return;
@@ -120,6 +116,145 @@ class BadgeService
             }
             Log::channel('recalculation')->info("Batch awarded " . count($toInsert) . " badges for match {$matchId}");
         }
+    }
+
+    /**
+     * Processa medalhas de marco em lote para membros de uma liga.
+     * @param Collection $members Collection de objetos com {user_id, points}
+     * @param string $leagueId
+     */
+    public function syncMilestoneBadgesBatch(Collection $members, string $leagueId): void
+    {
+        if ($members->isEmpty()) return;
+
+        $userIds = $members->pluck('user_id')->toArray();
+
+        $milestones = [
+            50 => 'points_50',
+            200 => 'points_200',
+            500 => 'points_500',
+            1000 => 'points_1000',
+        ];
+
+        // IDs das medalhas de marco
+        $milestoneSlugs = array_values($milestones);
+        $milestoneBadgeIds = $this->badges->whereIn('slug', $milestoneSlugs)->pluck('id')->toArray();
+
+        // Carrega existentes
+        $existingRecords = DB::table('user_badges')
+            ->where('league_id', $leagueId)
+            ->whereIn('user_id', $userIds)
+            ->whereIn('badge_id', $milestoneBadgeIds)
+            ->get()
+            ->groupBy('user_id');
+
+        $toInsert = [];
+        $idsToDelete = [];
+        $now = now();
+
+        foreach ($members as $member) {
+            $userExistingBadges = $existingRecords->get($member->user_id, collect());
+            $existingBadgeIds = $userExistingBadges->pluck('badge_id')->toArray();
+
+            $deservedBadgeIds = [];
+
+            foreach ($milestones as $points => $slug) {
+                if ($member->points >= $points && $this->badges->has($slug)) {
+                    $deservedBadgeIds[] = $this->badges->get($slug)->id;
+                }
+            }
+
+            // Insert
+            foreach ($deservedBadgeIds as $badgeId) {
+                if (!in_array($badgeId, $existingBadgeIds)) {
+                    $toInsert[] = [
+                        'user_id' => $member->user_id,
+                        'badge_id' => $badgeId,
+                        'league_id' => $leagueId,
+                        'match_id' => null,
+                        'created_at' => $now,
+                        'updated_at' => $now,
+                    ];
+                }
+            }
+
+            // Delete (Revoke)
+            foreach ($userExistingBadges as $record) {
+                if (!in_array($record->badge_id, $deservedBadgeIds)) {
+                    $idsToDelete[] = $record->id;
+                }
+            }
+        }
+
+        if (!empty($idsToDelete)) {
+            DB::table('user_badges')->whereIn('id', $idsToDelete)->delete();
+            Log::channel('recalculation')->info("Batch revoked " . count($idsToDelete) . " milestone badges for League {$leagueId}");
+        }
+
+        if (!empty($toInsert)) {
+            foreach (array_chunk($toInsert, 500) as $chunk) {
+                DB::table('user_badges')->insert($chunk);
+            }
+            Log::channel('recalculation')->info("Batch awarded " . count($toInsert) . " milestone badges for League {$leagueId}");
+        }
+    }
+
+    public function checkMilestoneBadges(string $userId, string $leagueId, int $totalPoints): array
+    {
+        $milestones = [
+            50 => 'points_50',
+            200 => 'points_200',
+            500 => 'points_500',
+            1000 => 'points_1000',
+        ];
+
+        $awarded = [];
+        $revoked = [];
+
+        $milestoneSlugs = array_values($milestones);
+        $milestoneBadgeIds = $this->badges->whereIn('slug', $milestoneSlugs)->pluck('id')->toArray();
+
+        $existingBadgeIds = DB::table('user_badges')
+            ->where('user_id', $userId)
+            ->where('league_id', $leagueId)
+            ->whereIn('badge_id', $milestoneBadgeIds)
+            ->pluck('badge_id')
+            ->toArray();
+
+        foreach ($milestones as $points => $slug) {
+            if (!$this->badges->has($slug)) continue;
+            $badge = $this->badges->get($slug);
+            $hasBadge = in_array($badge->id, $existingBadgeIds);
+
+            if ($totalPoints >= $points) {
+                if (!$hasBadge) {
+                    DB::table('user_badges')->insert([
+                        'user_id' => $userId,
+                        'badge_id' => $badge->id,
+                        'league_id' => $leagueId,
+                        'match_id' => null,
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ]);
+
+                    $awarded[] = $badge;
+                    Log::info("Milestone Badge awarded: {$badge->name} to User {$userId} in League {$leagueId}");
+                }
+            } else {
+                if ($hasBadge) {
+                    DB::table('user_badges')
+                        ->where('user_id', $userId)
+                        ->where('league_id', $leagueId)
+                        ->where('badge_id', $badge->id)
+                        ->delete();
+
+                    $revoked[] = $badge;
+                    Log::info("Milestone Badge revoked: {$badge->name} from User {$userId} in League {$leagueId}");
+                }
+            }
+        }
+
+        return ['awarded' => $awarded, 'revoked' => $revoked];
     }
 
     private function calculateDeservedBadges(Prediction $prediction, FootballMatch $match, array $stats): array
