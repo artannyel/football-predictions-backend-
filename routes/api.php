@@ -28,13 +28,15 @@ Route::middleware(['auth.admin'])->prefix('admin')->group(function () {
 });
 
 Route::middleware(['auth.firebase'])->group(function () {
-
     Route::get('/user', function (Request $request) {
         return response()->json([
             'message' => __('messages.auth.success'),
-            'user' => new UserResource($request->user()->load('badges')), // Carrega badges
+            'user' => new UserResource($request->user()), // Sem load('badges')
         ]);
     });
+
+    // Rota completa para tela de perfil
+    Route::get('/user/profile', [UserController::class, 'profile']);
 
     Route::post('/users', [UserController::class, 'store']);
 

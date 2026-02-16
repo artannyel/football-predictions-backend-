@@ -24,28 +24,22 @@ class DeactivateFinishedLeagues implements ShouldQueue
         if ($this->competitionId) {
             $query->where('competition_id', $this->competitionId);
         } else {
-            // Fallback: foca nas que já passaram da data
             $query->whereHas('competition.currentSeason', function ($q) {
                 $q->where('end_date', '<=', now()->toDateString());
             });
         }
 
-        // Carrega apenas os dados necessários para agrupar
         $leagues = $query->with('competition')->get();
 
         if ($leagues->isEmpty()) {
             return;
         }
 
-        // Agrupa por competition_id para evitar queries repetidas
         $leaguesByCompetition = $leagues->groupBy('competition_id');
 
         foreach ($leaguesByCompetition as $compId => $groupLeagues) {
-            // Pega a primeira liga do grupo para acessar os dados da competição/season
-            // (Assumindo que todas as ligas da mesma competição apontam para a mesma season atual, o que é verdade pela estrutura)
             $sampleLeague = $groupLeagues->first();
 
-            // Verifica UMA VEZ por competição
             $hasPendingMatches = FootballMatch::where('competition_id', $compId)
                 ->where('season_id', $sampleLeague->competition->current_season_id)
                 ->whereNotIn('status', ['FINISHED', 'CANCELED', 'AWARDED'])
@@ -58,12 +52,42 @@ class DeactivateFinishedLeagues implements ShouldQueue
                 continue;
             }
 
-            // Atualiza TODAS as ligas dessa competição de uma vez
-            $leagueIds = $groupLeagues->pluck('id')->toArray();
+            // Processa cada liga individualmente para definir o pódio
+            foreach ($groupLeagues as $league) {
+                $this->processPodiumAndDeactivate($league);
+            }
 
-            League::whereIn('id', $leagueIds)->update(['is_active' => false]);
-
-            Log::info("Deactivated " . count($leagueIds) . " leagues for competition {$compId} (Season Finished).");
+            Log::info("Processed " . count($groupLeagues) . " leagues for competition {$compId} (Season Finished).");
         }
+    }
+
+    private function processPodiumAndDeactivate(League $league)
+    {
+        // Busca top 3 membros
+        $topMembers = $league->members()
+            ->orderByPivot('points', 'desc')
+            ->orderByPivot('exact_score_count', 'desc')
+            ->orderByPivot('winner_diff_count', 'desc')
+            ->orderByPivot('winner_goal_count', 'desc')
+            ->orderByPivot('winner_only_count', 'desc')
+            ->orderByPivot('error_count', 'asc')
+            ->limit(3)
+            ->get();
+
+        $updateData = ['is_active' => false];
+
+        if ($topMembers->isNotEmpty()) {
+            $updateData['champion_id'] = $topMembers[0]->id;
+
+            if (isset($topMembers[1])) {
+                $updateData['runner_up_id'] = $topMembers[1]->id;
+            }
+
+            if (isset($topMembers[2])) {
+                $updateData['third_place_id'] = $topMembers[2]->id;
+            }
+        }
+
+        $league->update($updateData);
     }
 }
