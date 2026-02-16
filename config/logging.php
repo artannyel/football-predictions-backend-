@@ -73,6 +73,19 @@ return [
             'replace_placeholders' => true,
         ],
 
+        // Canal composto: Arquivo + Stderr
+        'recalculation' => [
+            'driver' => 'stack',
+            'channels' => ['recalculation_file', 'stderr'],
+            'ignore_exceptions' => false,
+        ],
+
+        'recalculation_file' => [
+            'driver' => 'single',
+            'path' => storage_path('logs/recalculation.log'),
+            'level' => 'info',
+        ],
+
         'slack' => [
             'driver' => 'slack',
             'url' => env('LOG_SLACK_WEBHOOK_URL'),
