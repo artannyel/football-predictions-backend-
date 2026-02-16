@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Badge;
 use App\Models\FootballMatch;
 use App\Models\Prediction;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -17,12 +18,6 @@ class BadgeService
         $this->badges = Badge::all()->keyBy('slug');
     }
 
-    /**
-     * Sincroniza as medalhas do usuário para um jogo específico.
-     *
-     * @param array $matchStats Estatísticas dos palpites do jogo (opcional)
-     * @return array{awarded: array, revoked: array}
-     */
     public function syncBadges(Prediction $prediction, FootballMatch $match, array $matchStats = []): array
     {
         $deservedBadgesSlugs = $this->calculateDeservedBadges($prediction, $match, $matchStats);
@@ -60,6 +55,73 @@ class BadgeService
         return ['awarded' => $awarded, 'revoked' => $revoked];
     }
 
+    /**
+     * Processa medalhas em lote para múltiplos palpites de um mesmo jogo.
+     * Otimizado para reduzir queries.
+     */
+    public function syncBadgesBatch(Collection $predictions, FootballMatch $match, array $matchStats = []): void
+    {
+        if ($predictions->isEmpty()) return;
+
+        $userIds = $predictions->pluck('user_id')->toArray();
+        $matchId = $match->external_id;
+
+        $existingRecords = DB::table('user_badges')
+            ->where('match_id', $matchId)
+            ->whereIn('user_id', $userIds)
+            ->get()
+            ->groupBy('user_id');
+
+        $toInsert = [];
+        $idsToDelete = [];
+        $now = now();
+
+        foreach ($predictions as $prediction) {
+            $deservedSlugs = $this->calculateDeservedBadges($prediction, $match, $matchStats);
+
+            $userExistingBadges = $existingRecords->get($prediction->user_id, collect());
+            $existingBadgeIds = $userExistingBadges->pluck('badge_id')->toArray();
+
+            $deservedBadgeIds = [];
+            foreach ($deservedSlugs as $slug) {
+                if ($this->badges->has($slug)) {
+                    $deservedBadgeIds[] = $this->badges->get($slug)->id;
+                }
+            }
+
+            foreach ($deservedBadgeIds as $badgeId) {
+                if (!in_array($badgeId, $existingBadgeIds)) {
+                    $toInsert[] = [
+                        'user_id' => $prediction->user_id,
+                        'badge_id' => $badgeId,
+                        'league_id' => $prediction->league_id,
+                        'match_id' => $matchId,
+                        'created_at' => $now,
+                        'updated_at' => $now,
+                    ];
+                }
+            }
+
+            foreach ($userExistingBadges as $record) {
+                if (!in_array($record->badge_id, $deservedBadgeIds)) {
+                    $idsToDelete[] = $record->id;
+                }
+            }
+        }
+
+        if (!empty($idsToDelete)) {
+            DB::table('user_badges')->whereIn('id', $idsToDelete)->delete();
+            Log::channel('recalculation')->info("Batch revoked " . count($idsToDelete) . " badges for match {$matchId}");
+        }
+
+        if (!empty($toInsert)) {
+            foreach (array_chunk($toInsert, 500) as $chunk) {
+                DB::table('user_badges')->insert($chunk);
+            }
+            Log::channel('recalculation')->info("Batch awarded " . count($toInsert) . " badges for match {$matchId}");
+        }
+    }
+
     private function calculateDeservedBadges(Prediction $prediction, FootballMatch $match, array $stats): array
     {
         $slugs = [];
@@ -68,27 +130,20 @@ class BadgeService
             return [];
         }
 
-        // 1. Sniper
         if ($prediction->result_type === 'EXACT_SCORE') {
             $slugs[] = 'sniper';
         }
 
-        // 2. Ousado (Empate)
         if ($match->score_fulltime_home === $match->score_fulltime_away) {
             $slugs[] = 'ousado';
         }
 
-        // 3. Zebra (Baseada na % da galera)
-        // Se acertou o vencedor (qualquer tipo de acerto que não seja empate, pois empate é Ousado)
-        // E a % desse resultado foi < 15%
         if (!empty($stats) && $match->score_fulltime_home !== $match->score_fulltime_away) {
             $isHomeWin = $match->score_fulltime_home > $match->score_fulltime_away;
 
-            // Se foi vitória do mandante e a % foi baixa
             if ($isHomeWin && ($stats['home_win_percentage'] ?? 100) < 15) {
                 $slugs[] = 'zebra';
             }
-            // Se foi vitória do visitante e a % foi baixa
             elseif (!$isHomeWin && ($stats['away_win_percentage'] ?? 100) < 15) {
                 $slugs[] = 'zebra';
             }
