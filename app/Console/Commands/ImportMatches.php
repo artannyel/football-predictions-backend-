@@ -49,7 +49,6 @@ class ImportMatches extends Command
                 $this->importMatchesForCompetition($service, $competition->external_id);
 
                 // Rate Limit Protection: Sleep 7 seconds between requests
-                // 60s / 7s = ~8.5 requests per minute (Safe limit is 10)
                 if ($index < $competitions->count() - 1) {
                     $this->info("Sleeping for 7 seconds to respect API rate limit...");
                     sleep(7);
@@ -68,7 +67,6 @@ class ImportMatches extends Command
         $this->info("Fetching matches for: {$compName}...");
 
         try {
-            // Podemos adicionar filtros aqui se necessário (ex: season atual)
             $response = $service->getCompetitionMatches($competitionId);
         } catch (\Exception $e) {
             $this->error("Failed to fetch matches for {$compName}: " . $e->getMessage());
@@ -88,7 +86,6 @@ class ImportMatches extends Command
         $bar->start();
 
         foreach ($matches as $data) {
-            // Ensure Teams Exist
             if (isset($data['homeTeam']['id'])) {
                 $this->ensureTeamExists($data['homeTeam']);
             }
@@ -110,7 +107,6 @@ class ImportMatches extends Command
                     'group' => $data['group'],
                     'last_updated_api' => isset($data['lastUpdated']) ? Carbon::parse($data['lastUpdated']) : null,
 
-                    // Score
                     'score_winner' => $data['score']['winner'] ?? null,
                     'score_duration' => $data['score']['duration'] ?? null,
                     'score_fulltime_home' => $data['score']['fullTime']['home'] ?? null,
@@ -118,7 +114,6 @@ class ImportMatches extends Command
                     'score_halftime_home' => $data['score']['halfTime']['home'] ?? null,
                     'score_halftime_away' => $data['score']['halfTime']['away'] ?? null,
 
-                    // Extra Time & Penalties (se existirem no JSON)
                     'score_extratime_home' => $data['score']['extraTime']['home'] ?? null,
                     'score_extratime_away' => $data['score']['extraTime']['away'] ?? null,
                     'score_penalties_home' => $data['score']['penalties']['home'] ?? null,
@@ -126,8 +121,9 @@ class ImportMatches extends Command
                 ]
             );
 
-            // Se o jogo acabou e foi atualizado/criado agora, processa os pontos
-            if ($match->status === 'FINISHED' && ($match->wasChanged() || $match->wasRecentlyCreated)) {
+            // Só processa se o jogo acabou E houve mudança relevante no placar/status
+            // Ignora mudanças apenas em last_updated_api
+            if ($match->status === 'FINISHED' && ($match->wasRecentlyCreated || $match->wasChanged(['status', 'score_fulltime_home', 'score_fulltime_away', 'score_winner']))) {
                 ProcessMatchResults::dispatch($match->external_id);
             }
 

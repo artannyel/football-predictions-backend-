@@ -32,8 +32,6 @@ class ProcessMatchResults implements ShouldQueue
             return;
         }
 
-        // Calcula estatísticas do jogo para usar na regra da Zebra
-        // Só faz sentido se o jogo terminou
         $matchStats = [];
         if ($match->status === 'FINISHED') {
             $matchStats = $statsAction->execute($match->external_id);
@@ -85,25 +83,36 @@ class ProcessMatchResults implements ShouldQueue
 
         if (!$league) return;
 
-        $updates = [
-            'points' => DB::raw("points + ($newPoints - $oldPoints)"),
-        ];
+        $updates = [];
 
-        if ($oldType && $oldType !== 'PENDING') {
-            $col = $this->getTypeColumn($oldType);
-            if ($col) $updates[$col] = DB::raw("$col - 1");
-        } else {
-            if (is_null($oldType)) {
-                $updates['total_predictions'] = DB::raw("total_predictions + 1");
+        // Só atualiza pontos se mudou
+        if ($newPoints !== $oldPoints) {
+            $updates['points'] = DB::raw("points + ($newPoints - $oldPoints)");
+        }
+
+        // Só atualiza contadores se o tipo mudou
+        if ($newType !== $oldType) {
+            // Decrementa antigo
+            if ($oldType && $oldType !== 'PENDING') {
+                $col = $this->getTypeColumn($oldType);
+                if ($col) $updates[$col] = DB::raw("$col - 1");
+            } else {
+                // Se não tinha tipo antes (primeira vez), incrementa total
+                if (is_null($oldType)) {
+                    $updates['total_predictions'] = DB::raw("total_predictions + 1");
+                }
+            }
+
+            // Incrementa novo
+            if ($newType && $newType !== 'PENDING') {
+                $col = $this->getTypeColumn($newType);
+                if ($col) $updates[$col] = DB::raw("$col + 1");
             }
         }
 
-        if ($newType && $newType !== 'PENDING') {
-            $col = $this->getTypeColumn($newType);
-            if ($col) $updates[$col] = DB::raw("$col + 1");
+        if (!empty($updates)) {
+            $league->members()->updateExistingPivot($userId, $updates);
         }
-
-        $league->members()->updateExistingPivot($userId, $updates);
     }
 
     private function getTypeColumn($type)
