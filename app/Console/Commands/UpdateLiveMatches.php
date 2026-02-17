@@ -109,8 +109,10 @@ class UpdateLiveMatches extends Command
                 $match->last_updated_api = isset($data['lastUpdated']) ? Carbon::parse($data['lastUpdated']) : now();
 
                 // Correção Crítica: Prioriza regularTime se existir
-                $homeScore = $data['score']['regularTime']['home'] ?? $data['score']['fullTime']['home'] ?? null;
-                $awayScore = $data['score']['regularTime']['away'] ?? $data['score']['fullTime']['away'] ?? null;
+                /*$homeScore = $data['score']['regularTime']['home'] ?? $data['score']['fullTime']['home'] ?? null;
+                $awayScore = $data['score']['regularTime']['away'] ?? $data['score']['fullTime']['away'] ?? null;*/
+                $homeScore = $data['score']['fullTime']['home'] ?? null;
+                $awayScore = $data['score']['fullTime']['away'] ?? null;
 
                 $match->score_winner = $data['score']['winner'] ?? null;
                 $match->score_duration = $data['score']['duration'] ?? null;
