@@ -66,6 +66,7 @@ class GetUserProfileStatsAction
                       ->orWhere('runner_up_id', $user->id)
                       ->orWhere('third_place_id', $user->id);
             })
+            ->where('is_active', false)
             ->with('competition')
             ->orderBy('updated_at', 'desc')
             ->get()
