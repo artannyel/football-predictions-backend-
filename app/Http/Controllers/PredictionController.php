@@ -11,6 +11,7 @@ use App\Models\League;
 use App\Models\Prediction;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 
 class PredictionController extends Controller
@@ -43,12 +44,24 @@ class PredictionController extends Controller
         $perPage = $request->query('per_page', 20);
 
         $query = $request->user()->predictions()
+            ->join('matches', 'predictions.match_id', '=', 'matches.external_id')
             ->with(['match.homeTeam', 'match.awayTeam'])
-            ->orderBy('created_at', 'desc');
+            ->select('predictions.*'); // Garante que pegamos os campos da prediction
 
         if ($leagueId) {
             $query->where('league_id', $leagueId);
         }
+
+        // Ordenação Personalizada: Ao Vivo primeiro
+        $query->orderByRaw("
+            CASE
+                WHEN matches.status IN ('IN_PLAY', 'PAUSED') THEN 1
+                ELSE 2
+            END ASC
+        ");
+
+        // Desempate por data do jogo (mais recentes primeiro)
+        $query->orderBy('matches.utc_date', 'desc');
 
         $predictions = $query->paginate($perPage);
 
