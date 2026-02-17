@@ -33,6 +33,10 @@ class GetUserProfileStatsAction
 
         $totalHits = $totalPredictions - ($globalStats->error_count ?? 0);
 
+        // Contagem de Ligas
+        $activeLeaguesCount = $user->leagues()->where('is_active', true)->count();
+        $finishedLeaguesCount = $user->leagues()->where('is_active', false)->count();
+
         $radar = [
             'precision' => 0,
             'technique' => 0,
@@ -40,9 +44,9 @@ class GetUserProfileStatsAction
         ];
 
         if ($totalHits > 0) {
-            $radar['precision'] = round(($globalStats->exact_score_count / $totalHits) * 100, 2);
-            $radar['technique'] = round((($globalStats->winner_diff_count + $globalStats->winner_goal_count) / $totalHits) * 100, 2);
-            $radar['safety'] = round(($globalStats->winner_only_count / $totalHits) * 100, 2);
+            $radar['precision'] = round(($globalStats->exact_score_count / $totalHits) * 100);
+            $radar['technique'] = round((($globalStats->winner_diff_count + $globalStats->winner_goal_count) / $totalHits) * 100);
+            $radar['safety'] = round(($globalStats->winner_only_count / $totalHits) * 100);
         }
 
         // 2. Histórico Recente
@@ -92,6 +96,8 @@ class GetUserProfileStatsAction
                 'total_predictions' => $totalPredictions,
                 'average_points' => $average,
                 'win_rate' => $totalPredictions > 0 ? round(($totalHits / $totalPredictions) * 100, 1) : 0,
+                'active_leagues_count' => $activeLeaguesCount,
+                'finished_leagues_count' => $finishedLeaguesCount,
                 'radar' => $radar,
                 'recent_form' => $recentForm,
             ],
