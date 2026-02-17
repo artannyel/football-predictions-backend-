@@ -64,10 +64,7 @@ class UpdateLiveMatches extends Command
                 $finishedCompetitions[] = $competitionId;
             }
 
-            $this->info('Is changed: ' . (int) $hasUpdates['changed']);
-            // Se houve qualquer atualização relevante (gol, status), sinaliza no Firestore
             if ($hasUpdates['changed']) {
-                $this->info('firestore');
                 $firestore->signalCompetitionUpdate($competitionId, [
                     'trigger' => 'live_update',
                     'matches_affected' => $hasUpdates['count']
@@ -111,17 +108,20 @@ class UpdateLiveMatches extends Command
                 $match->matchday = $data['matchday'];
                 $match->last_updated_api = isset($data['lastUpdated']) ? Carbon::parse($data['lastUpdated']) : now();
 
+                // Correção Crítica: Prioriza regularTime se existir
+                $homeScore = $data['score']['regularTime']['home'] ?? $data['score']['fullTime']['home'] ?? null;
+                $awayScore = $data['score']['regularTime']['away'] ?? $data['score']['fullTime']['away'] ?? null;
+
                 $match->score_winner = $data['score']['winner'] ?? null;
                 $match->score_duration = $data['score']['duration'] ?? null;
-                $match->score_fulltime_home = $data['score']['fullTime']['home'] ?? null;
-                $match->score_fulltime_away = $data['score']['fullTime']['away'] ?? null;
+                $match->score_fulltime_home = $homeScore;
+                $match->score_fulltime_away = $awayScore;
                 $match->score_halftime_home = $data['score']['halfTime']['home'] ?? null;
                 $match->score_halftime_away = $data['score']['halfTime']['away'] ?? null;
 
                 if ($match->isDirty()) {
                     $match->save();
 
-                    // Verifica mudanças relevantes para sinalização
                     if ($match->wasChanged(['status', 'score_fulltime_home', 'score_fulltime_away'])) {
                         Log::info("Match {$match->external_id} updated. Dispatching processing job.");
                         ProcessMatchResults::dispatch($match->external_id);

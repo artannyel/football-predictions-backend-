@@ -71,25 +71,28 @@ class UpdateDailyMatches extends Command
                 if (!$match) continue;
 
                 // Atualiza dados básicos
-                $match->utc_date = Carbon::parse($data['utcDate']); // Importante: horário pode ter mudado
+                $match->utc_date = Carbon::parse($data['utcDate']);
                 $match->status = $data['status'];
                 $match->matchday = $data['matchday'];
                 $match->last_updated_api = isset($data['lastUpdated']) ? Carbon::parse($data['lastUpdated']) : now();
 
-                // Score
+                // Correção Crítica: Prioriza regularTime se existir
+                $homeScore = $data['score']['regularTime']['home'] ?? $data['score']['fullTime']['home'] ?? null;
+                $awayScore = $data['score']['regularTime']['away'] ?? $data['score']['fullTime']['away'] ?? null;
+
                 $match->score_winner = $data['score']['winner'] ?? null;
                 $match->score_duration = $data['score']['duration'] ?? null;
-                $match->score_fulltime_home = $data['score']['fullTime']['home'] ?? null;
-                $match->score_fulltime_away = $data['score']['fullTime']['away'] ?? null;
+                $match->score_fulltime_home = $homeScore;
+                $match->score_fulltime_away = $awayScore;
                 $match->score_halftime_home = $data['score']['halfTime']['home'] ?? null;
                 $match->score_halftime_away = $data['score']['halfTime']['away'] ?? null;
 
                 if ($match->isDirty()) {
                     $match->save();
 
-                    // Se finalizou, processa pontos
-                    if ($match->wasChanged('status') && $match->status === 'FINISHED') {
-                        Log::info("Match {$match->external_id} finished (daily update). Dispatching processing job.");
+                    // Se finalizou ou mudou placar, processa pontos
+                    if ($match->status === 'FINISHED' && ($match->wasChanged(['status', 'score_fulltime_home', 'score_fulltime_away', 'score_winner']))) {
+                        Log::info("Match {$match->external_id} updated (daily update). Dispatching processing job.");
                         ProcessMatchResults::dispatch($match->external_id);
                     }
                 }
