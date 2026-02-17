@@ -61,7 +61,8 @@ class User extends Authenticatable
                 'winner_goal_count',
                 'winner_only_count',
                 'error_count',
-                'total_predictions'
+                'total_predictions',
+                'initial_powerups'
             ])
             ->orderBy('league_user.created_at')
             ->withTimestamps();

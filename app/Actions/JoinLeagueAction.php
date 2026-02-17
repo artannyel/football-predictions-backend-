@@ -4,11 +4,14 @@ namespace App\Actions;
 
 use App\Models\League;
 use App\Models\User;
+use App\Services\PowerUpService;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Validation\ValidationException;
 
 class JoinLeagueAction
 {
+    public function __construct(protected PowerUpService $powerUpService) {}
+
     public function execute(User $user, string $code): League
     {
         $league = League::where('code', strtoupper($code))->first();
@@ -27,7 +30,11 @@ class JoinLeagueAction
             return $league;
         }
 
-        $league->members()->attach($user->id);
+        $initialPowerUps = $this->powerUpService->calculateInitialBalance($league->competition_id);
+
+        $league->members()->attach($user->id, [
+            'initial_powerups' => $initialPowerUps
+        ]);
 
         return $league;
     }

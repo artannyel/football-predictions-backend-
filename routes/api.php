@@ -26,6 +26,7 @@ Route::middleware(['auth.admin'])->prefix('admin')->group(function () {
     Route::post('/recalculate-badges', [AdminController::class, 'recalculateBadges']);
     Route::post('/badges', [AdminController::class, 'updateBadges']);
     Route::post('/import-matches', [AdminController::class, 'importMatches']);
+    Route::post('/distribute-powerups', [AdminController::class, 'distributePowerUps']);
 
     // Logs
     Route::get('/logs', [AdminController::class, 'listLogs']);

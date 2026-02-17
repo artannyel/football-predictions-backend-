@@ -2,8 +2,10 @@
 
 namespace App\Http\Resources;
 
+use App\Models\Prediction;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 
 class LeagueResource extends JsonResource
@@ -41,6 +43,17 @@ class LeagueResource extends JsonResource
             'members_count' => $this->members_count ?? $this->members()->count(),
             'my_points' => $this->whenPivotLoaded('league_user', function () {
                 return $this->pivot->points;
+            }),
+            'my_powerups' => $this->whenPivotLoaded('league_user', function () use ($request) {
+                $initial = $this->pivot->initial_powerups;
+
+                // Calcula usados
+                $used = Prediction::where('user_id', $request->user()->id)
+                    ->where('league_id', $this->id)
+                    ->whereNotNull('powerup_used')
+                    ->count();
+
+                return max(0, $initial - $used);
             }),
         ];
     }

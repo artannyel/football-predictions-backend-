@@ -11,6 +11,7 @@ use App\Models\League;
 use App\Models\Prediction;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 
 class PredictionController extends Controller
 {
@@ -21,6 +22,7 @@ class PredictionController extends Controller
             'match_id' => 'required|exists:matches,external_id',
             'home_score' => 'required|integer|min:0',
             'away_score' => 'required|integer|min:0',
+            'use_powerup' => 'nullable|boolean',
         ]);
 
         $prediction = $action->execute($request->user(), $validated);
@@ -100,21 +102,18 @@ class PredictionController extends Controller
 
         $league = League::findOrFail($leagueId);
 
-        // Busca dados do usuário logado na liga (ME)
         $currentMember = $league->members()->where('user_id', $currentUser->id)->first();
 
         if (!$currentMember) {
             return response()->json(['message' => __('messages.league.not_member')], 403);
         }
 
-        // Busca dados do usuário alvo na liga (USER)
         $targetMember = $league->members()->where('user_id', $userId)->first();
 
         if (!$targetMember) {
             return response()->json(['message' => __('messages.league.target_not_member')], 404);
         }
 
-        // Busca palpites com comparação
         $predictions = $action->execute($userId, $leagueId, $currentUser->id, $perPage);
         $paginatedData = PredictionResource::collection($predictions)->response()->getData(true);
 

@@ -18,6 +18,7 @@ class Prediction extends Model
         'away_score',
         'points_earned',
         'result_type',
+        'powerup_used',
     ];
 
     public function user(): BelongsTo

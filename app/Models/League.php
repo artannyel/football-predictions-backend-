@@ -55,7 +55,8 @@ class League extends Model
                 'winner_goal_count',
                 'winner_only_count',
                 'error_count',
-                'total_predictions'
+                'total_predictions',
+                'initial_powerups'
             ])
             ->withTimestamps();
     }

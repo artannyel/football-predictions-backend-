@@ -69,10 +69,19 @@ class LeagueController extends Controller
 
     public function show(Request $request, string $id): JsonResponse
     {
-        $league = League::with(['competition', 'owner'])->findOrFail($id);
+        // Busca a liga através do relacionamento do usuário para carregar o pivot
+        $league = $request->user()->leagues()
+            ->with(['competition', 'owner'])
+            ->where('leagues.id', $id)
+            ->first();
 
-        if (!$league->members()->where('user_id', $request->user()->id)->exists()) {
-            return response()->json(['message' => __('messages.league.not_member')], 403);
+        if (!$league) {
+            // Se não encontrou via relacionamento, verifica se a liga existe (para dar erro 403 ou 404 correto)
+            $exists = League::find($id);
+            if ($exists) {
+                return response()->json(['message' => __('messages.league.not_member')], 403);
+            }
+            return response()->json(['message' => __('messages.league.not_found')], 404);
         }
 
         return response()->json([

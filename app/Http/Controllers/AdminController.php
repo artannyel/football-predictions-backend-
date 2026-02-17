@@ -3,13 +3,13 @@
 namespace App\Http\Controllers;
 
 use App\Actions\UpdateBadgesAction;
+use App\Jobs\DistributePowerUps;
 use App\Jobs\RecalculateAllStats;
 use App\Jobs\RecalculateBadges;
 use App\Jobs\RunImportMatches;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\File;
-use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class AdminController extends Controller
 {
@@ -95,5 +95,12 @@ class AdminController extends Controller
         RunImportMatches::dispatch($competitionId);
 
         return response()->json(['message' => 'Match import job dispatched.']);
+    }
+
+    public function distributePowerUps(Request $request): JsonResponse
+    {
+        DistributePowerUps::dispatch();
+
+        return response()->json(['message' => 'Power-Up distribution job dispatched.']);
     }
 }
