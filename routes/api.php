@@ -31,12 +31,15 @@ Route::middleware(['auth.firebase'])->group(function () {
     Route::get('/user', function (Request $request) {
         return response()->json([
             'message' => __('messages.auth.success'),
-            'user' => new UserResource($request->user()), // Sem load('badges')
+            'user' => new UserResource($request->user()),
         ]);
     });
 
-    // Rota completa para tela de perfil
+    // Rota completa para tela de perfil (Meu)
     Route::get('/user/profile', [UserController::class, 'profile']);
+
+    // Rota completa para tela de perfil (Outro Usuário)
+    Route::get('/users/{id}/profile', [UserController::class, 'showProfile']);
 
     Route::post('/users', [UserController::class, 'store']);
 

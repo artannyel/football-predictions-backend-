@@ -8,6 +8,7 @@ use App\DTOs\UserDTO;
 use App\Http\Requests\StoreUserRequest;
 use App\Http\Resources\UserProfileResource;
 use App\Http\Resources\UserResource;
+use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -27,7 +28,17 @@ class UserController extends Controller
 
     public function profile(Request $request, GetUserProfileStatsAction $action): JsonResponse
     {
-        $user = $request->user()->load('badges'); // Carrega badges aqui
+        $user = $request->user()->load('badges');
+        $stats = $action->execute($user);
+
+        return response()->json([
+            'data' => new UserProfileResource($user, $stats),
+        ]);
+    }
+
+    public function showProfile(string $id, GetUserProfileStatsAction $action): JsonResponse
+    {
+        $user = User::with('badges')->findOrFail($id);
         $stats = $action->execute($user);
 
         return response()->json([
