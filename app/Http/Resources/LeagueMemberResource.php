@@ -16,6 +16,22 @@ class LeagueMemberResource extends JsonResource
     public function toArray(Request $request): array
     {
         $disk = config('filesystems.default');
+        $leagueId = $this->pivot->league_id;
+
+        $badges = $this->badges()
+            ->wherePivot('league_id', $leagueId)
+            ->get()
+            ->groupBy('slug')
+            ->map(function ($group) use ($disk) {
+                $badge = $group->first();
+                return [
+                    'slug' => $badge->slug,
+                    'name' => $badge->name,
+                    'description' => $badge->description,
+                    'icon_url' => $badge->icon ? asset(Storage::disk($disk)->url($badge->icon)) : null,
+                    'count' => $group->count(),
+                ];
+            })->values();
 
         return [
             'id' => $this->id,
@@ -29,7 +45,8 @@ class LeagueMemberResource extends JsonResource
                 'winner_only' => $this->pivot->winner_only_count,
                 'errors' => $this->pivot->error_count,
                 'total' => $this->pivot->total_predictions,
-            ]
+            ],
+            'badges' => $badges,
         ];
     }
 }
