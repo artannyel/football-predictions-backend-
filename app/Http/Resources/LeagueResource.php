@@ -25,6 +25,9 @@ class LeagueResource extends JsonResource
             'description' => $this->description,
             'is_active' => (bool) $this->is_active,
             'pending_predictions_count' => $this->when(isset($this->pending_predictions_count), $this->pending_predictions_count),
+            'next_match' => $this->when(isset($this->next_match), function () {
+                return $this->next_match ? new MatchResource($this->next_match) : null;
+            }),
             'competition' => [
                 'id' => $this->competition->external_id,
                 'name' => $this->competition->name,

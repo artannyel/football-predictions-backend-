@@ -33,12 +33,38 @@ class ListUserLeaguesAction
         $perPage = $filters['per_page'] ?? 20;
         $leagues = $query->orderBy('created_at', 'desc')->paginate($perPage);
 
-        // Calcula palpites pendentes
-        $leagues->getCollection()->each(function ($league) use ($user) {
+        // Otimização: Buscar próximos jogos apenas para ligas ativas
+        $competitionIds = $leagues->getCollection()
+            ->where('is_active', true) // Filtra apenas ativas
+            ->pluck('competition_id')
+            ->unique()
+            ->toArray();
+
+        $nextMatches = [];
+        if (!empty($competitionIds)) {
+            $matches = FootballMatch::whereIn('competition_id', $competitionIds)
+                ->where('utc_date', '>', now())
+                ->whereIn('status', ['SCHEDULED', 'TIMED'])
+                ->orderBy('competition_id')
+                ->orderBy('utc_date', 'asc')
+                ->distinct('competition_id')
+                ->with(['homeTeam', 'awayTeam'])
+                ->get()
+                ->keyBy('competition_id');
+
+            $nextMatches = $matches;
+        }
+
+        // Processa cada liga
+        $leagues->getCollection()->each(function ($league) use ($user, $nextMatches) {
             if (!$league->is_active) {
                 $league->pending_predictions_count = 0;
+                $league->next_match = null;
                 return;
             }
+
+            // Anexa o próximo jogo
+            $league->next_match = $nextMatches->get($league->competition_id);
 
             $league->pending_predictions_count = FootballMatch::where('competition_id', $league->competition_id)
                 ->where('utc_date', '>', now())
