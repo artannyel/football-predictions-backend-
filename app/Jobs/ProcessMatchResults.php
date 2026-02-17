@@ -5,6 +5,7 @@ namespace App\Jobs;
 use App\Actions\CalculatePredictionPointsAction;
 use App\Actions\GetMatchPredictionStatsAction;
 use App\Models\FootballMatch;
+use App\Models\League;
 use App\Models\Prediction;
 use App\Services\BadgeService;
 use Illuminate\Bus\Queueable;
@@ -39,6 +40,9 @@ class ProcessMatchResults implements ShouldQueue
 
         $predictions = Prediction::where('match_id', $match->external_id)->get();
 
+        // Agrupa predições por liga para otimizar a verificação de pódio
+        $leaguesToUpdate = [];
+
         foreach ($predictions as $prediction) {
             $result = $calculator->execute($prediction, $match);
             $newPoints = $result['points'];
@@ -55,10 +59,11 @@ class ProcessMatchResults implements ShouldQueue
                 $badgeResult = $badgeService->syncBadges($prediction, $match, $matchStats);
             }
 
-            // Atualiza stats da liga
             $this->updateUserLeagueStats($prediction->user_id, $prediction->league_id, $oldPoints, $newPoints, $oldType, $newType);
 
-            // Verifica marcos de pontuação (apenas se o jogo terminou)
+            // Marca a liga para verificação posterior
+            $leaguesToUpdate[$prediction->league_id] = true;
+
             $milestoneResult = ['awarded' => [], 'revoked' => []];
             if ($match->status === 'FINISHED') {
                 $totalPoints = DB::table('league_user')
@@ -71,7 +76,6 @@ class ProcessMatchResults implements ShouldQueue
                 }
             }
 
-            // Combina medalhas ganhas e revogadas
             $allAwarded = array_merge($badgeResult['awarded'], $milestoneResult['awarded']);
             $allRevoked = array_merge($badgeResult['revoked'], $milestoneResult['revoked']);
 
@@ -92,6 +96,11 @@ class ProcessMatchResults implements ShouldQueue
             }
 
             $prediction->save();
+        }
+
+        // Verifica pódio das ligas afetadas
+        foreach (array_keys($leaguesToUpdate) as $leagueId) {
+            $this->updateLeaguePodiumIfFinished($leagueId);
         }
     }
 
@@ -126,6 +135,46 @@ class ProcessMatchResults implements ShouldQueue
         if (!empty($updates)) {
             $league->members()->updateExistingPivot($userId, $updates);
         }
+    }
+
+    private function updateLeaguePodiumIfFinished($leagueId)
+    {
+        $league = League::find($leagueId);
+
+        // Só recalcula se a liga já estiver finalizada
+        if (!$league || $league->is_active) {
+            return;
+        }
+
+        $topMembers = $league->members()
+            ->orderByPivot('points', 'desc')
+            ->orderByPivot('exact_score_count', 'desc')
+            ->orderByPivot('winner_diff_count', 'desc')
+            ->orderByPivot('winner_goal_count', 'desc')
+            ->orderByPivot('winner_only_count', 'desc')
+            ->orderByPivot('error_count', 'asc')
+            ->limit(3)
+            ->get();
+
+        $updateData = [
+            'champion_id' => null,
+            'runner_up_id' => null,
+            'third_place_id' => null,
+        ];
+
+        if ($topMembers->isNotEmpty()) {
+            $updateData['champion_id'] = $topMembers[0]->id;
+
+            if (isset($topMembers[1])) {
+                $updateData['runner_up_id'] = $topMembers[1]->id;
+            }
+
+            if (isset($topMembers[2])) {
+                $updateData['third_place_id'] = $topMembers[2]->id;
+            }
+        }
+
+        $league->update($updateData);
     }
 
     private function getTypeColumn($type)
