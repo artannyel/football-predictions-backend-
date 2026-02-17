@@ -44,6 +44,14 @@ class MatchResource extends JsonResource
                     'home' => $this->score_halftime_home,
                     'away' => $this->score_halftime_away,
                 ],
+                'extra_time' => [
+                    'home' => $this->score_extratime_home,
+                    'away' => $this->score_extratime_away
+                    ],
+                'penalties' => [
+                    'home' => $this->score_penalties_home,
+                    'away' => $this->score_penalties_away
+                ],
             ],
         ];
     }

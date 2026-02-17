@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Actions\UpdateBadgesAction;
 use App\Jobs\RecalculateAllStats;
 use App\Jobs\RecalculateBadges;
+use App\Jobs\RunImportMatches;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\File;
@@ -74,7 +75,6 @@ class AdminController extends Controller
 
     public function downloadLog(Request $request, string $filename)
     {
-        // Validação de segurança para evitar Path Traversal
         if (!preg_match('/^[a-zA-Z0-9._-]+$/', $filename)) {
             return response()->json(['message' => 'Invalid filename'], 400);
         }
@@ -86,5 +86,14 @@ class AdminController extends Controller
         }
 
         return response()->download($path);
+    }
+
+    public function importMatches(Request $request): JsonResponse
+    {
+        $competitionId = $request->input('competition_id');
+
+        RunImportMatches::dispatch($competitionId);
+
+        return response()->json(['message' => 'Match import job dispatched.']);
     }
 }

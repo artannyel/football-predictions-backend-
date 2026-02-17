@@ -93,6 +93,10 @@ class ImportMatches extends Command
                 $this->ensureTeamExists($data['awayTeam']);
             }
 
+            // Correção Crítica: Prioriza regularTime se existir (para jogos com prorrogação/pênaltis)
+            $homeScore = $data['score']['regularTime']['home'] ?? $data['score']['fullTime']['home'] ?? null;
+            $awayScore = $data['score']['regularTime']['away'] ?? $data['score']['fullTime']['away'] ?? null;
+
             $match = FootballMatch::updateOrCreate(
                 ['external_id' => $data['id']],
                 [
@@ -109,8 +113,8 @@ class ImportMatches extends Command
 
                     'score_winner' => $data['score']['winner'] ?? null,
                     'score_duration' => $data['score']['duration'] ?? null,
-                    'score_fulltime_home' => $data['score']['fullTime']['home'] ?? null,
-                    'score_fulltime_away' => $data['score']['fullTime']['away'] ?? null,
+                    'score_fulltime_home' => $homeScore,
+                    'score_fulltime_away' => $awayScore,
                     'score_halftime_home' => $data['score']['halfTime']['home'] ?? null,
                     'score_halftime_away' => $data['score']['halfTime']['away'] ?? null,
 
@@ -121,8 +125,6 @@ class ImportMatches extends Command
                 ]
             );
 
-            // Só processa se o jogo acabou E houve mudança relevante no placar/status
-            // Ignora mudanças apenas em last_updated_api
             if ($match->status === 'FINISHED' && ($match->wasRecentlyCreated || $match->wasChanged(['status', 'score_fulltime_home', 'score_fulltime_away', 'score_winner']))) {
                 ProcessMatchResults::dispatch($match->external_id);
             }
