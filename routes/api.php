@@ -25,9 +25,15 @@ Route::middleware(['auth.admin'])->prefix('admin')->group(function () {
     Route::post('/recalculate-stats', [AdminController::class, 'recalculateStats']);
     Route::post('/recalculate-badges', [AdminController::class, 'recalculateBadges']);
     Route::post('/badges', [AdminController::class, 'updateBadges']);
+
+    // Logs
+    Route::get('/logs', [AdminController::class, 'listLogs']);
+    Route::get('/logs/{filename}', [AdminController::class, 'downloadLog']);
 });
 
 Route::middleware(['auth.firebase'])->group(function () {
+
+    // Rota leve para boot/auth
     Route::get('/user', function (Request $request) {
         return response()->json([
             'message' => __('messages.auth.success'),

@@ -7,6 +7,8 @@ use App\Jobs\RecalculateAllStats;
 use App\Jobs\RecalculateBadges;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\File;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class AdminController extends Controller
 {
@@ -33,10 +35,9 @@ class AdminController extends Controller
             'badges.*.slug' => 'required|string|exists:badges,slug',
             'badges.*.name' => 'nullable|string',
             'badges.*.description' => 'nullable|string',
-            'badges.*.icon_file' => 'nullable|image|max:10240',
+            'badges.*.icon_file' => 'nullable|image|max:2048',
         ]);
 
-        // Processa upload de arquivos
         $data = [];
         $badgesInput = $request->input('badges');
         $badgesFiles = $request->file('badges');
@@ -52,5 +53,38 @@ class AdminController extends Controller
         $action->execute($data);
 
         return response()->json(['message' => 'Badges updated successfully.']);
+    }
+
+    public function listLogs(Request $request): JsonResponse
+    {
+        $path = storage_path('logs');
+        $files = File::files($path);
+
+        $logs = [];
+        foreach ($files as $file) {
+            $logs[] = [
+                'name' => $file->getFilename(),
+                'size' => round($file->getSize() / 1024, 2) . ' KB',
+                'updated_at' => date('Y-m-d H:i:s', $file->getMTime()),
+            ];
+        }
+
+        return response()->json(['logs' => $logs]);
+    }
+
+    public function downloadLog(Request $request, string $filename)
+    {
+        // Validação de segurança para evitar Path Traversal
+        if (!preg_match('/^[a-zA-Z0-9._-]+$/', $filename)) {
+            return response()->json(['message' => 'Invalid filename'], 400);
+        }
+
+        $path = storage_path('logs/' . $filename);
+
+        if (!File::exists($path)) {
+            return response()->json(['message' => 'Log file not found'], 404);
+        }
+
+        return response()->download($path);
     }
 }
