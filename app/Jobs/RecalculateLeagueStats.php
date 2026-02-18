@@ -70,6 +70,7 @@ class RecalculateLeagueStats implements ShouldQueue
         // 4. Atualizar total_predictions (incluindo não finalizados)
         $totals = DB::table('predictions')
             ->where('league_id', $league->id)
+            ->whereNotNull('result_type')
             ->select('user_id', DB::raw('count(*) as total'))
             ->groupBy('user_id')
             ->get();

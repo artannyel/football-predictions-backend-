@@ -76,12 +76,19 @@ class UpdateDailyMatches extends Command
                 $match->matchday = $data['matchday'];
                 $match->last_updated_api = isset($data['lastUpdated']) ? Carbon::parse($data['lastUpdated']) : now();
 
-                // Correção Crítica: Prioriza regularTime se existir
-                $homeScore = $data['score']['regularTime']['home'] ?? $data['score']['fullTime']['home'] ?? null;
-                $awayScore = $data['score']['regularTime']['away'] ?? $data['score']['fullTime']['away'] ?? null;
+                // Lógica de Score baseada na Duração
+                $duration = $data['score']['duration'] ?? 'REGULAR';
+
+                if ($duration === 'REGULAR') {
+                    $homeScore = $data['score']['fullTime']['home'] ?? null;
+                    $awayScore = $data['score']['fullTime']['away'] ?? null;
+                } else {
+                    $homeScore = $data['score']['regularTime']['home'] ?? $data['score']['fullTime']['home'] ?? null;
+                    $awayScore = $data['score']['regularTime']['away'] ?? $data['score']['fullTime']['away'] ?? null;
+                }
 
                 $match->score_winner = $data['score']['winner'] ?? null;
-                $match->score_duration = $data['score']['duration'] ?? null;
+                $match->score_duration = $duration;
                 $match->score_fulltime_home = $homeScore;
                 $match->score_fulltime_away = $awayScore;
                 $match->score_halftime_home = $data['score']['halfTime']['home'] ?? null;

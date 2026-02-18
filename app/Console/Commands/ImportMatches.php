@@ -93,9 +93,17 @@ class ImportMatches extends Command
                 $this->ensureTeamExists($data['awayTeam']);
             }
 
-            // Correção Crítica: Prioriza regularTime se existir (para jogos com prorrogação/pênaltis)
-            $homeScore = $data['score']['regularTime']['home'] ?? $data['score']['fullTime']['home'] ?? null;
-            $awayScore = $data['score']['regularTime']['away'] ?? $data['score']['fullTime']['away'] ?? null;
+            // Lógica de Score baseada na Duração
+            $duration = $data['score']['duration'] ?? 'REGULAR';
+
+            if ($duration === 'REGULAR') {
+                $homeScore = $data['score']['fullTime']['home'] ?? null;
+                $awayScore = $data['score']['fullTime']['away'] ?? null;
+            } else {
+                // Se for prorrogação ou pênaltis, tenta pegar o tempo regulamentar
+                $homeScore = $data['score']['regularTime']['home'] ?? $data['score']['fullTime']['home'] ?? null;
+                $awayScore = $data['score']['regularTime']['away'] ?? $data['score']['fullTime']['away'] ?? null;
+            }
 
             $match = FootballMatch::updateOrCreate(
                 ['external_id' => $data['id']],
@@ -112,7 +120,7 @@ class ImportMatches extends Command
                     'last_updated_api' => isset($data['lastUpdated']) ? Carbon::parse($data['lastUpdated']) : null,
 
                     'score_winner' => $data['score']['winner'] ?? null,
-                    'score_duration' => $data['score']['duration'] ?? null,
+                    'score_duration' => $duration,
                     'score_fulltime_home' => $homeScore,
                     'score_fulltime_away' => $awayScore,
                     'score_halftime_home' => $data['score']['halfTime']['home'] ?? null,
