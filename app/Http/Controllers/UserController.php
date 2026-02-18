@@ -45,4 +45,20 @@ class UserController extends Controller
             'data' => new UserProfileResource($user, $stats),
         ]);
     }
+
+    public function updateSettings(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'notify_results' => 'boolean',
+            'notify_reminders' => 'boolean',
+        ]);
+
+        $user = $request->user();
+        $user->update($validated);
+
+        return response()->json([
+            'message' => 'Settings updated.',
+            'data' => new UserResource($user),
+        ]);
+    }
 }

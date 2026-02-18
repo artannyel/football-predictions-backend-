@@ -53,9 +53,12 @@ class SendPredictionReminders extends Command
                     ->pluck('user_id')
                     ->toArray();
 
+                // Busca membros que querem receber lembretes
                 $allMembers = DB::table('league_user')
-                    ->where('league_id', $league->id)
-                    ->pluck('user_id')
+                    ->join('users', 'league_user.user_id', '=', 'users.id')
+                    ->where('league_user.league_id', $league->id)
+                    ->where('users.notify_reminders', true) // Filtro de preferência
+                    ->pluck('users.id')
                     ->toArray();
 
                 $pendingUserIds = array_diff($allMembers, $usersWithFullPredictions);
@@ -77,7 +80,7 @@ class SendPredictionReminders extends Command
                 }
 
                 $frontendUrl = env('FRONTEND_URL');
-                $url = $frontendUrl ? "{$frontendUrl}/liga/{$league->id}" : null; // Corrigido para /liga
+                $url = $frontendUrl ? "{$frontendUrl}/liga/{$league->id}" : null;
 
                 foreach (array_chunk($pendingUserIds, 500) as $chunk) {
                     $oneSignal->sendToUsers($chunk, $title, $message, [

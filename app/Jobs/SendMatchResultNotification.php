@@ -22,12 +22,17 @@ class SendMatchResultNotification implements ShouldQueue
         protected string $resultType,
         protected string $leagueId,
         protected array $newBadges = [],
-        protected array $revokedBadges = [] // Novo parâmetro
+        protected array $revokedBadges = []
     ) {}
 
     public function handle(OneSignalService $oneSignal): void
     {
-        // Se não ganhou pontos e não houve mudança de medalhas, não notifica
+        // Verifica preferência do usuário
+        $user = User::find($this->userId);
+        if (!$user || !$user->notify_results) {
+            return;
+        }
+
         if ($this->points <= 0 && empty($this->newBadges) && empty($this->revokedBadges)) {
             return;
         }
@@ -42,13 +47,11 @@ class SendMatchResultNotification implements ShouldQueue
         $title = "Fim de jogo: {$home} x {$away}";
         $message = $this->getMessage($this->points, $this->resultType);
 
-        // Adiciona mensagem de medalha ganha
         if (!empty($this->newBadges)) {
             $badgeNames = array_map(fn($b) => $b->name, $this->newBadges);
             $message .= "\n🏅 Conquista: " . implode(', ', $badgeNames) . "!";
         }
 
-        // Adiciona mensagem de medalha revogada
         if (!empty($this->revokedBadges)) {
             $badgeNames = array_map(fn($b) => $b->name, $this->revokedBadges);
             $message .= "\n⚠️ Correção: A medalha " . implode(', ', $badgeNames) . " foi removida devido à mudança no placar.";

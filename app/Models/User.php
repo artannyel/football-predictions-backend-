@@ -26,6 +26,8 @@ class User extends Authenticatable
         'email',
         'password',
         'photo_url',
+        'notify_results', // Adicionado
+        'notify_reminders', // Adicionado
     ];
 
     /**
@@ -48,6 +50,8 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'notify_results' => 'boolean', // Adicionado
+            'notify_reminders' => 'boolean', // Adicionado
         ];
     }
 

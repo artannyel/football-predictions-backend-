@@ -22,6 +22,8 @@ class UserResource extends JsonResource
             'name' => $this->name,
             'email' => $this->email,
             'photo_url' => $this->photo_url ? asset(Storage::disk($disk)->url($this->photo_url)) : null,
+            'notify_results' => (bool) $this->notify_results,
+            'notify_reminders' => (bool) $this->notify_reminders,
             'created_at' => $this->created_at,
             'badges' => $this->whenLoaded('badges', function () use ($disk) {
                 return $this->badges->groupBy('slug')->map(function ($group) use ($disk) {
