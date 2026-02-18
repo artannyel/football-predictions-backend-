@@ -30,6 +30,10 @@ Route::middleware(['auth.admin'])->prefix('admin')->group(function () {
     Route::post('/import-matches', [AdminController::class, 'importMatches']);
     Route::post('/distribute-powerups', [AdminController::class, 'distributePowerUps']);
 
+    // Manual Match Fix
+    Route::get('/matches/stuck', [AdminController::class, 'listStuckMatches']);
+    Route::post('/matches/{id}/fix', [AdminController::class, 'fixMatch']);
+
     // Logs
     Route::get('/logs', [AdminController::class, 'listLogs']);
     Route::get('/logs/{filename}', [AdminController::class, 'downloadLog']);

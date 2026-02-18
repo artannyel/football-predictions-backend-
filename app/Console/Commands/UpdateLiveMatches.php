@@ -104,6 +104,11 @@ class UpdateLiveMatches extends Command
 
                 if (!$match) continue;
 
+                // Proteção contra sobrescrita manual
+                if ($match->is_manual_update) {
+                    continue;
+                }
+
                 $match->status = $data['status'];
                 $match->matchday = $data['matchday'];
                 $match->last_updated_api = isset($data['lastUpdated']) ? Carbon::parse($data['lastUpdated']) : now();

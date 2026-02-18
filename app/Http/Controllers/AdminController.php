@@ -2,12 +2,16 @@
 
 namespace App\Http\Controllers;
 
+use App\Actions\FixMatchAction;
+use App\Actions\ListStuckMatchesAction;
 use App\Actions\UpdateBadgesAction;
+use App\Http\Resources\MatchResource;
 use App\Jobs\DistributePowerUps;
 use App\Jobs\RecalculateAllStats;
 use App\Jobs\RecalculateBadges;
 use App\Jobs\RecalculateGlobalStats;
 use App\Jobs\RunImportMatches;
+use App\Models\FootballMatch;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\File;
@@ -110,5 +114,39 @@ class AdminController extends Controller
         DistributePowerUps::dispatch();
 
         return response()->json(['message' => 'Power-Up distribution job dispatched.']);
+    }
+
+    public function listStuckMatches(ListStuckMatchesAction $action): JsonResponse
+    {
+        $matches = $action->execute();
+
+        return response()->json(['data' => MatchResource::collection($matches)]);
+    }
+
+    public function fixMatch(Request $request, string $id, FixMatchAction $action): JsonResponse
+    {
+        $match = FootballMatch::where('external_id', $id)->firstOrFail();
+
+        $validated = $request->validate([
+            'status' => 'nullable|string',
+            'score_fulltime_home' => 'nullable|integer',
+            'score_fulltime_away' => 'nullable|integer',
+            'score_halftime_home' => 'nullable|integer',
+            'score_halftime_away' => 'nullable|integer',
+            'score_extratime_home' => 'nullable|integer',
+            'score_extratime_away' => 'nullable|integer',
+            'score_penalties_home' => 'nullable|integer',
+            'score_penalties_away' => 'nullable|integer',
+            'score_winner' => 'nullable|string',
+            'score_duration' => 'nullable|string',
+            'unlock' => 'nullable|boolean',
+        ]);
+
+        $updatedMatch = $action->execute($match, $validated);
+
+        return response()->json([
+            'message' => 'Match updated manually.',
+            'data' => new MatchResource($updatedMatch),
+        ]);
     }
 }

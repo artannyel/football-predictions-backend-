@@ -70,6 +70,11 @@ class UpdateDailyMatches extends Command
 
                 if (!$match) continue;
 
+                // Proteção contra sobrescrita manual
+                if ($match->is_manual_update) {
+                    continue;
+                }
+
                 // Atualiza dados básicos
                 $match->utc_date = Carbon::parse($data['utcDate']);
                 $match->status = $data['status'];

@@ -86,6 +86,13 @@ class ImportMatches extends Command
         $bar->start();
 
         foreach ($matches as $data) {
+            // Proteção contra sobrescrita manual
+            $existingMatch = FootballMatch::where('external_id', $data['id'])->first();
+            if ($existingMatch && $existingMatch->is_manual_update) {
+                $bar->advance();
+                continue;
+            }
+
             if (isset($data['homeTeam']['id'])) {
                 $this->ensureTeamExists($data['homeTeam']);
             }
@@ -100,7 +107,6 @@ class ImportMatches extends Command
                 $homeScore = $data['score']['fullTime']['home'] ?? null;
                 $awayScore = $data['score']['fullTime']['away'] ?? null;
             } else {
-                // Se for prorrogação ou pênaltis, tenta pegar o tempo regulamentar
                 $homeScore = $data['score']['regularTime']['home'] ?? $data['score']['fullTime']['home'] ?? null;
                 $awayScore = $data['score']['regularTime']['away'] ?? $data['score']['fullTime']['away'] ?? null;
             }
