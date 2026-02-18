@@ -2,101 +2,92 @@
 
 namespace App\Console\Commands;
 
-use App\Models\Competition;
 use App\Models\FootballMatch;
 use App\Models\League;
 use App\Models\User;
 use App\Services\OneSignalService;
 use Illuminate\Console\Command;
-use Illuminate\Database\Eloquent\Builder;
-use Carbon\Carbon;
+use Illuminate\Support\Facades\DB;
 
 class SendPredictionReminders extends Command
 {
     protected $signature = 'send:prediction-reminders';
-    protected $description = 'Send push notifications to users who have not predicted upcoming matches for today.';
+    protected $description = 'Send push notifications to users 1 hour before matches start.';
 
     public function handle(OneSignalService $oneSignal)
     {
-        $this->info('Starting prediction reminders...');
+        $this->info('Starting prediction reminders (1h before)...');
 
-        // 1. Definir janela de tempo: Agora até o final do dia no Brasil (convertido para UTC)
-        $now = now();
-        $endOfDayBRT = Carbon::now('America/Sao_Paulo')->endOfDay()->setTimezone('UTC');
+        $startWindow = now()->addMinutes(55);
+        $endWindow = now()->addMinutes(65);
 
-        // Se já passou do fim do dia no Brasil (madrugada UTC), não manda nada ou ajusta lógica
-        if ($now > $endOfDayBRT) {
-            $this->info('No more matches for today (BRT).');
-            return;
-        }
-
-        $upcomingMatches = FootballMatch::where('utc_date', '>', $now)
-            ->where('utc_date', '<=', $endOfDayBRT)
+        $matches = FootballMatch::where('utc_date', '>=', $startWindow)
+            ->where('utc_date', '<=', $endWindow)
             ->whereIn('status', ['SCHEDULED', 'TIMED'])
-            ->get()
-            ->groupBy('competition_id');
+            ->with(['homeTeam', 'awayTeam', 'competition'])
+            ->get();
 
-        if ($upcomingMatches->isEmpty()) {
-            $this->info('No upcoming matches for the rest of the day.');
+        if ($matches->isEmpty()) {
+            $this->info('No matches starting in ~1h.');
             return;
         }
 
-        $frontendUrl = env('FRONTEND_URL');
-        $url = $frontendUrl ? "{$frontendUrl}/ligas" : null;
+        $matchesByCompetition = $matches->groupBy('competition_id');
 
-        foreach ($upcomingMatches as $competitionId => $matches) {
-            $matchIds = $matches->pluck('external_id')->toArray();
-            $matchCount = count($matchIds);
+        foreach ($matchesByCompetition as $competitionId => $compMatches) {
+            $matchIds = $compMatches->pluck('external_id')->toArray();
 
-            $competition = Competition::where('external_id', $competitionId)->first();
-            $compName = $competition ? $competition->name : 'Campeonato';
-
-            $this->info("Processing {$compName} ({$competitionId}) - {$matchCount} matches...");
-
-            // Busca todas as ligas ativas dessa competição
             $leagues = League::where('competition_id', $competitionId)
                 ->where('is_active', true)
                 ->get();
 
             if ($leagues->isEmpty()) continue;
 
-            $usersToNotify = [];
-
-            // Para cada liga, busca quem está devendo pelo menos 1 palpite
             foreach ($leagues as $league) {
-                // Usuários desta liga que têm menos palpites NESTA LIGA do que o total de jogos do dia
-                $pendingUsers = User::whereHas('leagues', function ($q) use ($league) {
-                    $q->where('leagues.id', $league->id);
-                })
-                ->where(function ($q) use ($matchIds, $matchCount, $league) {
-                    $q->whereHas('predictions', function ($sq) use ($matchIds, $league) {
-                        $sq->whereIn('match_id', $matchIds)
-                           ->where('league_id', $league->id);
-                    }, '<', $matchCount); // Se tem menos palpites que jogos, tem pendência
-                })
-                ->pluck('id')
-                ->toArray();
+                $usersWithFullPredictions = DB::table('predictions')
+                    ->where('league_id', $league->id)
+                    ->whereIn('match_id', $matchIds)
+                    ->select('user_id')
+                    ->groupBy('user_id')
+                    ->havingRaw('COUNT(DISTINCT match_id) = ?', [count($matchIds)])
+                    ->pluck('user_id')
+                    ->toArray();
 
-                foreach ($pendingUsers as $userId) {
-                    $usersToNotify[$userId] = true; // Garante unicidade por competição
+                $allMembers = DB::table('league_user')
+                    ->where('league_id', $league->id)
+                    ->pluck('user_id')
+                    ->toArray();
+
+                $pendingUserIds = array_diff($allMembers, $usersWithFullPredictions);
+
+                if (empty($pendingUserIds)) continue;
+
+                $count = count($matchIds);
+                $compName = $compMatches->first()->competition->name;
+
+                if ($count === 1) {
+                    $match = $compMatches->first();
+                    $home = $match->homeTeam->short_name ?? $match->homeTeam->name;
+                    $away = $match->awayTeam->short_name ?? $match->awayTeam->name;
+                    $title = "⏰ Começa em 1h: {$home} x {$away}";
+                    $message = "Faça seu palpite na liga {$league->name} agora!";
+                } else {
+                    $title = "⏰ {$count} jogos começam em 1h!";
+                    $message = "Não esqueça de palpitar na liga {$league->name} ({$compName}).";
                 }
-            }
 
-            if (!empty($usersToNotify)) {
-                $userIds = array_keys($usersToNotify);
+                $frontendUrl = env('FRONTEND_URL');
+                $url = $frontendUrl ? "{$frontendUrl}/liga/{$league->id}" : null; // Corrigido para /liga
 
-                foreach (array_chunk($userIds, 500) as $chunk) {
-                    $title = "Jogos de hoje: {$compName} ⚽";
-                    $message = "Você tem palpite(s) pendente(s) para a competição {$compName}. Não perca pontos! 🎯";
-
+                foreach (array_chunk($pendingUserIds, 500) as $chunk) {
                     $oneSignal->sendToUsers($chunk, $title, $message, [
                         'type' => 'reminder',
-                        'count' => $matchCount,
+                        'league_id' => $league->id,
                         'click_action' => 'FLUTTER_NOTIFICATION_CLICK',
                     ], $url);
                 }
 
-                $this->info("Sent reminders to " . count($userIds) . " unique users.");
+                $this->info("Sent reminders to " . count($pendingUserIds) . " users in league {$league->id}.");
             }
         }
 

@@ -23,7 +23,5 @@ Schedule::command('import:competitions')->dailyAt('02:55');
 // Sincronização completa de jogos (novos jogos, rodadas futuras) diariamente às 03:00
 Schedule::command('import:matches')->dailyAt('03:00');
 
-// Lembretes de palpites (Horários BRT: 09:00 e 17:00)
-// UTC = BRT + 3
-Schedule::command('send:prediction-reminders')->dailyAt('12:00'); // 09:00 BRT
-Schedule::command('send:prediction-reminders')->dailyAt('20:00'); // 17:00 BRT
+// Lembretes de palpites: Roda a cada hora para pegar jogos começando em 1h
+Schedule::command('send:prediction-reminders')->hourly();
