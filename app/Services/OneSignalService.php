@@ -46,6 +46,7 @@ class OneSignalService
                 'target_channel' => 'push',
                 'headings' => ['en' => $title, 'pt' => $title],
                 'contents' => ['en' => $message, 'pt' => $message],
+                'small_icon' => 'ic_stat_notification_icon',
                 'data' => $data,
             ];
 
@@ -82,6 +83,7 @@ class OneSignalService
                 'included_segments' => ['Total Subscriptions'],
                 'headings' => ['en' => $title, 'pt' => $title],
                 'contents' => ['en' => $message, 'pt' => $message],
+                'small_icon' => 'ic_stat_notification_icon',
                 'data' => $data,
             ];
 
