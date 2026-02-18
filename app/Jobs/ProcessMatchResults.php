@@ -8,6 +8,7 @@ use App\Models\FootballMatch;
 use App\Models\League;
 use App\Models\Prediction;
 use App\Services\BadgeService;
+use App\Services\UserStatsService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -24,7 +25,8 @@ class ProcessMatchResults implements ShouldQueue
     public function handle(
         CalculatePredictionPointsAction $calculator,
         BadgeService $badgeService,
-        GetMatchPredictionStatsAction $statsAction
+        GetMatchPredictionStatsAction $statsAction,
+        UserStatsService $userStatsService
     ): void
     {
         $match = FootballMatch::where('external_id', $this->matchExternalId)->first();
@@ -39,9 +41,8 @@ class ProcessMatchResults implements ShouldQueue
         }
 
         $predictions = Prediction::where('match_id', $match->external_id)->get();
-
-        // Agrupa predições por liga para otimizar a verificação de pódio
         $leaguesToUpdate = [];
+        $usersToUpdateStats = []; // Para agrupar chamadas ao UserStatsService
 
         foreach ($predictions as $prediction) {
             $result = $calculator->execute($prediction, $match);
@@ -54,14 +55,18 @@ class ProcessMatchResults implements ShouldQueue
             $prediction->points_earned = $newPoints;
             $prediction->result_type = $newType;
 
+            // Salva primeiro para que o UserStatsService possa consultar o valor atualizado
+            $prediction->save();
+
             $badgeResult = ['awarded' => [], 'revoked' => []];
             if ($match->status === 'FINISHED') {
                 $badgeResult = $badgeService->syncBadges($prediction, $match, $matchStats);
+
+                // Marca usuário para atualização de stats globais (apenas uma vez por usuário)
+                $usersToUpdateStats[$prediction->user_id] = true;
             }
 
             $this->updateUserLeagueStats($prediction->user_id, $prediction->league_id, $oldPoints, $newPoints, $oldType, $newType);
-
-            // Marca a liga para verificação posterior
             $leaguesToUpdate[$prediction->league_id] = true;
 
             $milestoneResult = ['awarded' => [], 'revoked' => []];
@@ -90,15 +95,13 @@ class ProcessMatchResults implements ShouldQueue
                     $allRevoked
                 );
             }
-
-            if ($newPoints === $oldPoints && $newType === $oldType && empty($allAwarded) && empty($allRevoked)) {
-                continue;
-            }
-
-            $prediction->save();
         }
 
-        // Verifica pódio das ligas afetadas
+        // Atualiza Stats Globais (uma vez por usuário, buscando o melhor palpite)
+        foreach (array_keys($usersToUpdateStats) as $userId) {
+            $userStatsService->processPrediction($userId, $match);
+        }
+
         foreach (array_keys($leaguesToUpdate) as $leagueId) {
             $this->updateLeaguePodiumIfFinished($leagueId);
         }
@@ -141,7 +144,6 @@ class ProcessMatchResults implements ShouldQueue
     {
         $league = League::find($leagueId);
 
-        // Só recalcula se a liga já estiver finalizada
         if (!$league || $league->is_active) {
             return;
         }

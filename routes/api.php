@@ -5,6 +5,7 @@ use App\Http\Controllers\CompetitionController;
 use App\Http\Controllers\LeagueController;
 use App\Http\Controllers\MatchController;
 use App\Http\Controllers\PredictionController;
+use App\Http\Controllers\RankingController;
 use App\Http\Controllers\RulesController;
 use App\Http\Controllers\UserController;
 use App\Http\Resources\UserResource;
@@ -24,6 +25,7 @@ Route::get('/ping', function () {
 Route::middleware(['auth.admin'])->prefix('admin')->group(function () {
     Route::post('/recalculate-stats', [AdminController::class, 'recalculateStats']);
     Route::post('/recalculate-badges', [AdminController::class, 'recalculateBadges']);
+    Route::post('/recalculate-global-stats', [AdminController::class, 'recalculateGlobalStats']);
     Route::post('/badges', [AdminController::class, 'updateBadges']);
     Route::post('/import-matches', [AdminController::class, 'importMatches']);
     Route::post('/distribute-powerups', [AdminController::class, 'distributePowerUps']);
@@ -76,6 +78,9 @@ Route::middleware(['auth.firebase'])->group(function () {
     Route::get('/predictions/upcoming', [PredictionController::class, 'upcoming']); // Exige ?league_id=...
     Route::get('/predictions/user/{userId}', [PredictionController::class, 'userPredictions']);
     Route::get('/predictions/{id}', [PredictionController::class, 'show']);
+
+    // Rankings Globais
+    Route::get('/rankings/global', [RankingController::class, 'global']);
 
     // Rules
     Route::get('/rules', [RulesController::class, 'index']);

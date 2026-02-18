@@ -75,6 +75,28 @@ class RulesController extends Controller
                     'description' => 'Quem errou menos palpites vence. Premia a eficiência.'
                 ]
             ],
+            'global_ranking' => [
+                'title' => 'Ranking Global & Hall da Fama',
+                'description' => 'O Ranking Global premia a qualidade dos seus acertos. Aqui, quem acerta mais Placares Exatos fica na frente, independente dos pontos totais.',
+                'rules' => [
+                    [
+                        'title' => '🎯 Qualidade > Quantidade',
+                        'description' => 'A hierarquia é: Placares Exatos ➔ Saldos ➔ Gols ➔ Vencedores. Pontos são usados apenas para desempate final.'
+                    ],
+                    [
+                        'title' => '🛡️ Anti-Farm',
+                        'description' => 'Palpites só contam se a liga tiver pelo menos 2 participantes antes do jogo começar.'
+                    ],
+                    [
+                        'title' => '🏆 Melhor Palpite',
+                        'description' => 'Se você palpitar no mesmo jogo em várias ligas, apenas o seu melhor resultado conta.'
+                    ],
+                    [
+                        'title' => '📅 Períodos',
+                        'description' => 'Dispute o ranking Mensal, Anual e o Global (Eterno).'
+                    ]
+                ]
+            ],
             'badges' => BadgeResource::collection(Badge::all())
         ]);
     }

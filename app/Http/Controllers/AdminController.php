@@ -6,6 +6,7 @@ use App\Actions\UpdateBadgesAction;
 use App\Jobs\DistributePowerUps;
 use App\Jobs\RecalculateAllStats;
 use App\Jobs\RecalculateBadges;
+use App\Jobs\RecalculateGlobalStats;
 use App\Jobs\RunImportMatches;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -27,6 +28,13 @@ class AdminController extends Controller
         RecalculateBadges::dispatch($badgeSlug);
 
         return response()->json(['message' => 'Badges recalculation job dispatched.']);
+    }
+
+    public function recalculateGlobalStats(Request $request): JsonResponse
+    {
+        RecalculateGlobalStats::dispatch();
+
+        return response()->json(['message' => 'Global Stats recalculation job dispatched.']);
     }
 
     public function updateBadges(Request $request, UpdateBadgesAction $action): JsonResponse
