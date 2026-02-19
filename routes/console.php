@@ -25,3 +25,9 @@ Schedule::command('import:matches')->dailyAt('03:00');
 
 // Lembretes de palpites: Roda a cada hora para pegar jogos começando em 1h
 Schedule::command('send:prediction-reminders')->hourly();
+
+// Distribuição de Medalhas Mensais (Dia 5 de cada mês às 04:00)
+Schedule::command('badges:award monthly')->monthlyOn(5, '04:00');
+
+// Distribuição de Medalhas Anuais (Dia 5 de Janeiro às 05:00)
+Schedule::command('badges:award season')->yearlyOn(1, 5, '05:00');
