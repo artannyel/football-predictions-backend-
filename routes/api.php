@@ -57,6 +57,9 @@ Route::middleware(['auth.firebase'])->group(function () {
 
     Route::post('/users', [UserController::class, 'store']);
 
+    // Configurações de Notificação
+    Route::post('/user/settings', [UserController::class, 'updateSettings']);
+
     // Competitions
     Route::get('/competitions', [CompetitionController::class, 'index']);
     Route::get('/competitions/{id}/matches', [CompetitionController::class, 'matches']);
