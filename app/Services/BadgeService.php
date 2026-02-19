@@ -118,11 +118,6 @@ class BadgeService
         }
     }
 
-    /**
-     * Processa medalhas de marco em lote para membros de uma liga.
-     * @param Collection $members Collection de objetos com {user_id, points}
-     * @param string $leagueId
-     */
     public function syncMilestoneBadgesBatch(Collection $members, string $leagueId): void
     {
         if ($members->isEmpty()) return;
@@ -136,11 +131,9 @@ class BadgeService
             1000 => 'points_1000',
         ];
 
-        // IDs das medalhas de marco
         $milestoneSlugs = array_values($milestones);
         $milestoneBadgeIds = $this->badges->whereIn('slug', $milestoneSlugs)->pluck('id')->toArray();
 
-        // Carrega existentes
         $existingRecords = DB::table('user_badges')
             ->where('league_id', $leagueId)
             ->whereIn('user_id', $userIds)
@@ -164,7 +157,6 @@ class BadgeService
                 }
             }
 
-            // Insert
             foreach ($deservedBadgeIds as $badgeId) {
                 if (!in_array($badgeId, $existingBadgeIds)) {
                     $toInsert[] = [
@@ -178,7 +170,6 @@ class BadgeService
                 }
             }
 
-            // Delete (Revoke)
             foreach ($userExistingBadges as $record) {
                 if (!in_array($record->badge_id, $deservedBadgeIds)) {
                     $idsToDelete[] = $record->id;
@@ -260,6 +251,18 @@ class BadgeService
     private function calculateDeservedBadges(Prediction $prediction, FootballMatch $match, array $stats): array
     {
         $slugs = [];
+
+        // Power-Up Badges
+        if ($prediction->powerup_used === 'x2') {
+            if ($prediction->points_earned <= 0) {
+                $slugs[] = 'waster'; // Mão Furada
+                return $slugs; // Se zerou, não ganha mais nada
+            }
+
+            if ($prediction->result_type === 'EXACT_SCORE') {
+                $slugs[] = 'magician'; // Mágico
+            }
+        }
 
         if ($prediction->points_earned <= 0) {
             return [];
