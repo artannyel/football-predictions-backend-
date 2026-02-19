@@ -80,7 +80,7 @@ class SendPredictionReminders extends Command
                 }
 
                 $frontendUrl = env('FRONTEND_URL');
-                $url = $frontendUrl ? "{$frontendUrl}/liga/{$league->id}" : null;
+                $url = $frontendUrl ? "{$frontendUrl}/ligas/{$league->id}" : null;
 
                 foreach (array_chunk($pendingUserIds, 500) as $chunk) {
                     $oneSignal->sendToUsers($chunk, $title, $message, [
