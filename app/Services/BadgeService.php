@@ -22,9 +22,11 @@ class BadgeService
     {
         $deservedBadgesSlugs = $this->calculateDeservedBadges($prediction, $match, $matchStats);
 
+        // Correção: Verifica medalhas existentes PARA ESTA LIGA
         $existingBadges = DB::table('user_badges')
             ->where('user_id', $prediction->user_id)
             ->where('match_id', $prediction->match_id)
+            ->where('league_id', $prediction->league_id) // Adicionado filtro de liga
             ->pluck('badge_id')
             ->toArray();
 
@@ -62,11 +64,12 @@ class BadgeService
         $userIds = $predictions->pluck('user_id')->toArray();
         $matchId = $match->external_id;
 
+        // Carrega existentes agrupados por (user_id + league_id)
+        // Como a chave do grupo precisa ser composta, vamos agrupar no PHP
         $existingRecords = DB::table('user_badges')
             ->where('match_id', $matchId)
             ->whereIn('user_id', $userIds)
-            ->get()
-            ->groupBy('user_id');
+            ->get();
 
         $toInsert = [];
         $idsToDelete = [];
@@ -75,8 +78,12 @@ class BadgeService
         foreach ($predictions as $prediction) {
             $deservedSlugs = $this->calculateDeservedBadges($prediction, $match, $matchStats);
 
-            $userExistingBadges = $existingRecords->get($prediction->user_id, collect());
-            $existingBadgeIds = $userExistingBadges->pluck('badge_id')->toArray();
+            // Filtra registros existentes para este usuário E esta liga
+            $userLeagueBadges = $existingRecords->filter(function ($record) use ($prediction) {
+                return $record->user_id == $prediction->user_id && $record->league_id == $prediction->league_id;
+            });
+
+            $existingBadgeIds = $userLeagueBadges->pluck('badge_id')->toArray();
 
             $deservedBadgeIds = [];
             foreach ($deservedSlugs as $slug) {
@@ -98,7 +105,7 @@ class BadgeService
                 }
             }
 
-            foreach ($userExistingBadges as $record) {
+            foreach ($userLeagueBadges as $record) {
                 if (!in_array($record->badge_id, $deservedBadgeIds)) {
                     $idsToDelete[] = $record->id;
                 }
@@ -255,12 +262,12 @@ class BadgeService
         // Power-Up Badges
         if ($prediction->powerup_used === 'x2') {
             if ($prediction->points_earned <= 0) {
-                $slugs[] = 'waster'; // Mão Furada
-                return $slugs; // Se zerou, não ganha mais nada
+                $slugs[] = 'waster';
+                return $slugs;
             }
 
             if ($prediction->result_type === 'EXACT_SCORE') {
-                $slugs[] = 'magician'; // Mágico
+                $slugs[] = 'magician';
             }
         }
 
@@ -316,6 +323,7 @@ class BadgeService
             ->where('user_id', $prediction->user_id)
             ->where('badge_id', $badge->id)
             ->where('match_id', $prediction->match_id)
+            ->where('league_id', $prediction->league_id) // Adicionado filtro de liga
             ->delete();
 
         Log::info("Badge revoked: {$badge->name} from User {$prediction->user_id}");
