@@ -19,6 +19,11 @@ return Application::configure(basePath: dirname(__DIR__))
             'auth.firebase' => AuthenticateFirebaseToken::class,
             'auth.admin' => CheckAdminKey::class,
         ]);
+
+        // Aplica throttle na API
+        $middleware->api(prepend: [
+            'throttle:api',
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         Integration::handles($exceptions);
