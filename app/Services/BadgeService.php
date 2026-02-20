@@ -22,11 +22,10 @@ class BadgeService
     {
         $deservedBadgesSlugs = $this->calculateDeservedBadges($prediction, $match, $matchStats);
 
-        // Correção: Verifica medalhas existentes PARA ESTA LIGA
         $existingBadges = DB::table('user_badges')
             ->where('user_id', $prediction->user_id)
             ->where('match_id', $prediction->match_id)
-            ->where('league_id', $prediction->league_id) // Adicionado filtro de liga
+            ->where('league_id', $prediction->league_id)
             ->pluck('badge_id')
             ->toArray();
 
@@ -64,8 +63,6 @@ class BadgeService
         $userIds = $predictions->pluck('user_id')->toArray();
         $matchId = $match->external_id;
 
-        // Carrega existentes agrupados por (user_id + league_id)
-        // Como a chave do grupo precisa ser composta, vamos agrupar no PHP
         $existingRecords = DB::table('user_badges')
             ->where('match_id', $matchId)
             ->whereIn('user_id', $userIds)
@@ -78,7 +75,6 @@ class BadgeService
         foreach ($predictions as $prediction) {
             $deservedSlugs = $this->calculateDeservedBadges($prediction, $match, $matchStats);
 
-            // Filtra registros existentes para este usuário E esta liga
             $userLeagueBadges = $existingRecords->filter(function ($record) use ($prediction) {
                 return $record->user_id == $prediction->user_id && $record->league_id == $prediction->league_id;
             });
@@ -99,6 +95,7 @@ class BadgeService
                         'badge_id' => $badgeId,
                         'league_id' => $prediction->league_id,
                         'match_id' => $matchId,
+                        'prediction_id' => $prediction->id,
                         'created_at' => $now,
                         'updated_at' => $now,
                     ];
@@ -171,6 +168,7 @@ class BadgeService
                         'badge_id' => $badgeId,
                         'league_id' => $leagueId,
                         'match_id' => null,
+                        'prediction_id' => null,
                         'created_at' => $now,
                         'updated_at' => $now,
                     ];
@@ -231,6 +229,7 @@ class BadgeService
                         'badge_id' => $badge->id,
                         'league_id' => $leagueId,
                         'match_id' => null,
+                        'prediction_id' => null,
                         'created_at' => now(),
                         'updated_at' => now(),
                     ]);
@@ -307,6 +306,7 @@ class BadgeService
             'badge_id' => $badge->id,
             'league_id' => $prediction->league_id,
             'match_id' => $prediction->match_id,
+            'prediction_id' => $prediction->id,
             'created_at' => now(),
             'updated_at' => now(),
         ]);
@@ -323,7 +323,7 @@ class BadgeService
             ->where('user_id', $prediction->user_id)
             ->where('badge_id', $badge->id)
             ->where('match_id', $prediction->match_id)
-            ->where('league_id', $prediction->league_id) // Adicionado filtro de liga
+            ->where('league_id', $prediction->league_id)
             ->delete();
 
         Log::info("Badge revoked: {$badge->name} from User {$prediction->user_id}");

@@ -45,14 +45,13 @@ class PredictionController extends Controller
 
         $query = $request->user()->predictions()
             ->join('matches', 'predictions.match_id', '=', 'matches.external_id')
-            ->with(['match.homeTeam', 'match.awayTeam'])
-            ->select('predictions.*'); // Garante que pegamos os campos da prediction
+            ->with(['match.homeTeam', 'match.awayTeam', 'badges'])
+            ->select('predictions.*');
 
         if ($leagueId) {
             $query->where('league_id', $leagueId);
         }
 
-        // Ordenação Personalizada: Ao Vivo primeiro
         $query->orderByRaw("
             CASE
                 WHEN matches.status IN ('IN_PLAY', 'PAUSED') THEN 1
@@ -60,7 +59,6 @@ class PredictionController extends Controller
             END ASC
         ");
 
-        // Desempate por data do jogo (mais recentes primeiro)
         $query->orderBy('matches.utc_date', 'desc');
 
         $predictions = $query->paginate($perPage);
@@ -87,7 +85,7 @@ class PredictionController extends Controller
 
     public function show(Request $request, string $id): JsonResponse
     {
-        $prediction = Prediction::with(['match.homeTeam', 'match.awayTeam'])->find($id);
+        $prediction = Prediction::with(['match.homeTeam', 'match.awayTeam', 'badges'])->find($id);
 
         if (!$prediction) {
             return response()->json(['message' => __('messages.prediction.not_found')], 404);

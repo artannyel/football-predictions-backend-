@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class Prediction extends Model
 {
@@ -34,5 +35,11 @@ class Prediction extends Model
     public function match(): BelongsTo
     {
         return $this->belongsTo(FootballMatch::class, 'match_id', 'external_id');
+    }
+
+    public function badges(): BelongsToMany
+    {
+        return $this->belongsToMany(Badge::class, 'user_badges', 'prediction_id', 'badge_id')
+            ->withTimestamps();
     }
 }

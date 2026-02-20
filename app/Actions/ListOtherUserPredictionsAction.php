@@ -27,10 +27,11 @@ class ListOtherUserPredictionsAction
             return $paginator;
         }
 
-        // Busca palpites do Target
+        // Busca palpites do Target com Badges
         $targetPredictions = Prediction::where('user_id', $targetUserId)
             ->where('league_id', $leagueId)
             ->whereIn('match_id', $matchIds)
+            ->with('badges')
             ->get()
             ->keyBy('match_id');
 
@@ -38,6 +39,7 @@ class ListOtherUserPredictionsAction
         $myPredictions = Prediction::where('user_id', $currentUserId)
             ->where('league_id', $leagueId)
             ->whereIn('match_id', $matchIds)
+            ->with('badges')
             ->get()
             ->keyBy('match_id');
 
@@ -45,15 +47,11 @@ class ListOtherUserPredictionsAction
             $targetPred = $targetPredictions->get($match->external_id);
             $myPred = $myPredictions->get($match->external_id);
 
-            // Se o target tem palpite, usamos ele como base (mantém compatibilidade)
             if ($targetPred) {
-                $targetPred->setRelation('match', $match); // Injeta o match carregado
+                $targetPred->setRelation('match', $match);
                 $targetPred->my_prediction = $myPred;
                 return $targetPred;
             }
-
-            // Se o target NÃO tem palpite, criamos um objeto Prediction "fake" ou vazio
-            // para que o Resource consiga renderizar o jogo e mostrar "Não palpitou".
 
             $fakePrediction = new Prediction([
                 'id' => null,

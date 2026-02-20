@@ -19,6 +19,7 @@ class BadgeResource extends JsonResource
 
         return [
             'slug' => $this->slug,
+            'type' => $this->type,
             'name' => $this->name,
             'description' => $this->description,
             'icon_url' => $this->icon ? asset(Storage::disk($disk)->url($this->icon)) : null,
