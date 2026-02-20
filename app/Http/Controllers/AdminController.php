@@ -13,6 +13,7 @@ use App\Jobs\RecalculateGlobalStats;
 use App\Jobs\RunImportMatches;
 use App\Models\Competition;
 use App\Models\FootballMatch;
+use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\File;
@@ -136,12 +137,22 @@ class AdminController extends Controller
             $query->where('competition_id', $request->input('competition_id'));
         }
 
+        // Filtro de Data com Conversão PHP (Mais seguro e portável)
+        // Assume que a data recebida é BRT (America/Sao_Paulo) e converte para UTC para buscar no banco.
+        $timezone = 'America/Sao_Paulo';
+
         if ($request->has('date_from')) {
-            $query->whereDate('utc_date', '>=', $request->input('date_from'));
+            // Cria data no fuso BRT (00:00:00)
+            $start = Carbon::createFromFormat('Y-m-d', $request->input('date_from'), $timezone)->startOfDay();
+            // Converte para UTC
+            $query->where('utc_date', '>=', $start->setTimezone('UTC'));
         }
 
         if ($request->has('date_to')) {
-            $query->whereDate('utc_date', '<=', $request->input('date_to'));
+            // Cria data no fuso BRT (23:59:59)
+            $end = Carbon::createFromFormat('Y-m-d', $request->input('date_to'), $timezone)->endOfDay();
+            // Converte para UTC
+            $query->where('utc_date', '<=', $end->setTimezone('UTC'));
         }
 
         if ($request->has('team_name')) {
