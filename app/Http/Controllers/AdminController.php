@@ -137,21 +137,15 @@ class AdminController extends Controller
             $query->where('competition_id', $request->input('competition_id'));
         }
 
-        // Filtro de Data com Conversão PHP (Mais seguro e portável)
-        // Assume que a data recebida é BRT (America/Sao_Paulo) e converte para UTC para buscar no banco.
         $timezone = 'America/Sao_Paulo';
 
         if ($request->has('date_from')) {
-            // Cria data no fuso BRT (00:00:00)
             $start = Carbon::createFromFormat('Y-m-d', $request->input('date_from'), $timezone)->startOfDay();
-            // Converte para UTC
             $query->where('utc_date', '>=', $start->setTimezone('UTC'));
         }
 
         if ($request->has('date_to')) {
-            // Cria data no fuso BRT (23:59:59)
             $end = Carbon::createFromFormat('Y-m-d', $request->input('date_to'), $timezone)->endOfDay();
-            // Converte para UTC
             $query->where('utc_date', '<=', $end->setTimezone('UTC'));
         }
 
