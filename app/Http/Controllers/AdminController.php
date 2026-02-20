@@ -5,12 +5,14 @@ namespace App\Http\Controllers;
 use App\Actions\FixMatchAction;
 use App\Actions\ListStuckMatchesAction;
 use App\Actions\UpdateBadgesAction;
+use App\Http\Resources\BadgeResource;
 use App\Http\Resources\MatchResource;
 use App\Jobs\DistributePowerUps;
 use App\Jobs\RecalculateAllStats;
 use App\Jobs\RecalculateBadges;
 use App\Jobs\RecalculateGlobalStats;
 use App\Jobs\RunImportMatches;
+use App\Models\Badge;
 use App\Models\Competition;
 use App\Models\FootballMatch;
 use Carbon\Carbon;
@@ -41,6 +43,12 @@ class AdminController extends Controller
         RecalculateGlobalStats::dispatch();
 
         return response()->json(['message' => 'Global Stats recalculation job dispatched.']);
+    }
+
+    public function listBadges(): JsonResponse
+    {
+        $badges = Badge::all();
+        return response()->json(['data' => BadgeResource::collection($badges)]);
     }
 
     public function updateBadges(Request $request, UpdateBadgesAction $action): JsonResponse

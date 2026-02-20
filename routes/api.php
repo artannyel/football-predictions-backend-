@@ -27,13 +27,17 @@ Route::middleware(['auth.admin'])->prefix('admin')->group(function () {
     Route::post('/recalculate-stats', [AdminController::class, 'recalculateStats']);
     Route::post('/recalculate-badges', [AdminController::class, 'recalculateBadges']);
     Route::post('/recalculate-global-stats', [AdminController::class, 'recalculateGlobalStats']);
+
+    // Badges Management
+    Route::get('/badges', [AdminController::class, 'listBadges']);
     Route::post('/badges', [AdminController::class, 'updateBadges']);
+
     Route::post('/import-matches', [AdminController::class, 'importMatches']);
     Route::post('/distribute-powerups', [AdminController::class, 'distributePowerUps']);
 
     // Manual Match Fix
-    Route::get('/matches', [AdminController::class, 'listMatches']); // Novo
-    Route::get('/filters', [AdminController::class, 'getFilters']); // Novo
+    Route::get('/matches', [AdminController::class, 'listMatches']);
+    Route::get('/filters', [AdminController::class, 'getFilters']);
     Route::get('/matches/stuck', [AdminController::class, 'listStuckMatches']);
     Route::post('/matches/{id}/fix', [AdminController::class, 'fixMatch']);
 
