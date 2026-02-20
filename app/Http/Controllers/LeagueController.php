@@ -7,13 +7,14 @@ use App\Actions\JoinLeagueAction;
 use App\Actions\ListUpcomingCompetitionMatchesAction;
 use App\Actions\ListUserLeaguesAction;
 use App\Actions\UpdateLeagueAction;
+use App\Http\Resources\LeagueFeedResource;
 use App\Http\Resources\LeagueResource;
 use App\Http\Resources\MatchResource;
 use App\Models\League;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Validation\ValidationException;
 
 class LeagueController extends Controller
 {
@@ -69,14 +70,12 @@ class LeagueController extends Controller
 
     public function show(Request $request, string $id): JsonResponse
     {
-        // Busca a liga através do relacionamento do usuário para carregar o pivot
         $league = $request->user()->leagues()
             ->with(['competition', 'owner'])
             ->where('leagues.id', $id)
             ->first();
 
         if (!$league) {
-            // Se não encontrou via relacionamento, verifica se a liga existe (para dar erro 403 ou 404 correto)
             $exists = League::find($id);
             if ($exists) {
                 return response()->json(['message' => __('messages.league.not_member')], 403);
@@ -166,5 +165,45 @@ class LeagueController extends Controller
             'message' => __('messages.league.joined'),
             'data' => new LeagueResource($league->load(['competition', 'owner'])),
         ]);
+    }
+
+    public function feed(Request $request, string $id): JsonResponse
+    {
+        $league = League::findOrFail($id);
+
+        if (!$league->members()->where('user_id', $request->user()->id)->exists()) {
+            return response()->json(['message' => __('messages.league.not_member')], 403);
+        }
+
+        $feed = DB::table('user_badges')
+            ->join('users', 'user_badges.user_id', '=', 'users.id')
+            ->join('badges', 'user_badges.badge_id', '=', 'badges.id')
+            ->leftJoin('matches', 'user_badges.match_id', '=', 'matches.external_id')
+            ->leftJoin('teams as home', 'matches.home_team_id', '=', 'home.external_id')
+            ->leftJoin('teams as away', 'matches.away_team_id', '=', 'away.external_id')
+            ->where('user_badges.league_id', $id)
+            ->select(
+                'user_badges.id',
+                'user_badges.created_at',
+                'users.id as user_id',
+                'users.name as user_name',
+                'users.photo_url as user_photo',
+                'badges.name as badge_name',
+                'badges.icon as badge_icon',
+                'badges.slug as badge_slug',
+                'matches.external_id as match_id',
+                'home.short_name as home_team',
+                'home.crest as home_team_crest',
+                'away.short_name as away_team',
+                'away.crest as away_team_crest',
+                'matches.score_fulltime_home',
+                'matches.score_fulltime_away'
+            )
+            ->orderBy('user_badges.created_at', 'desc')
+            ->paginate(20);
+
+        return response()->json(
+            LeagueFeedResource::collection($feed)->response()->getData(true)
+        );
     }
 }

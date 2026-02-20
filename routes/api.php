@@ -75,6 +75,7 @@ Route::middleware(['auth.firebase'])->group(function () {
     Route::get('/leagues/{id}', [LeagueController::class, 'show']);
     Route::post('/leagues/{id}', [LeagueController::class, 'update']);
     Route::get('/leagues/{id}/ranking', [LeagueController::class, 'ranking']);
+    Route::get('/leagues/{id}/feed', [LeagueController::class, 'feed']);
 
     // Jogos disponíveis para palpitar NA LIGA
     Route::get('/leagues/{id}/matches/upcoming', [LeagueController::class, 'upcomingMatches']);
