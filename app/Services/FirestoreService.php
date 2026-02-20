@@ -49,28 +49,32 @@ class FirestoreService
         return $creds['project_id'] ?? env('FIREBASE_PROJECT_ID');
     }
 
+    private function getAccessToken()
+    {
+        if (!$this->credentials) return null;
+
+        $sa = new ServiceAccountCredentials(
+            'https://www.googleapis.com/auth/datastore',
+            $this->credentials
+        );
+
+        $token = $sa->fetchAuthToken();
+        return $token['access_token'];
+    }
+
     public function signalCompetitionUpdate(int $competitionId, array $metadata = []): void
     {
-        if (!$this->projectId || !$this->credentials) {
-            Log::error("Firestore configuration missing (Project ID or Credentials).");
+        if (!$this->projectId) {
+            Log::error("Firestore configuration missing (Project ID).");
             return;
         }
 
         try {
-            // 1. Obter Access Token
-            $sa = new ServiceAccountCredentials(
-                'https://www.googleapis.com/auth/datastore',
-                $this->credentials
-            );
+            $accessToken = $this->getAccessToken();
+            if (!$accessToken) return;
 
-            $token = $sa->fetchAuthToken();
-            $accessToken = $token['access_token'];
-
-            // 2. Montar URL da API REST
-            // https://firestore.googleapis.com/v1/projects/{projectId}/databases/(default)/documents/{collection}/{id}
             $url = "https://firestore.googleapis.com/v1/projects/{$this->projectId}/databases/(default)/documents/competition_updates/" . $competitionId;
 
-            // 3. Montar Payload (Formato específico do Firestore REST)
             $fields = [
                 'updated_at' => ['integerValue' => (string) time()],
                 'last_update_iso' => ['stringValue' => now()->toIso8601String()],
@@ -86,7 +90,6 @@ class FirestoreService
                 }
             }
 
-            // 4. Fazer Request (PATCH para update/create)
             $response = Http::withToken($accessToken)
                 ->patch($url, [
                     'fields' => $fields
@@ -100,6 +103,50 @@ class FirestoreService
 
         } catch (\Exception $e) {
             Log::error("Failed to signal Firestore update: " . $e->getMessage());
+        }
+    }
+
+    public function addChatMessage(string $leagueId, array $messageData): bool
+    {
+        if (!$this->projectId) {
+            Log::error("Firestore configuration missing (Project ID).");
+            return false;
+        }
+
+        try {
+            $accessToken = $this->getAccessToken();
+            if (!$accessToken) return false;
+
+            // URL para criar documento na subcoleção 'messages'
+            // POST https://firestore.googleapis.com/v1/projects/{projectId}/databases/(default)/documents/leagues/{leagueId}/messages
+            $url = "https://firestore.googleapis.com/v1/projects/{$this->projectId}/databases/(default)/documents/leagues/{$leagueId}/messages";
+
+            $fields = [
+                'text' => ['stringValue' => $messageData['text']],
+                'userId' => ['stringValue' => $messageData['userId']],
+                'userName' => ['stringValue' => $messageData['userName']],
+                'createdAt' => ['timestampValue' => now()->toIso8601String()], // Formato RFC 3339
+            ];
+
+            if (!empty($messageData['userPhoto'])) {
+                $fields['userPhoto'] = ['stringValue' => $messageData['userPhoto']];
+            }
+
+            $response = Http::withToken($accessToken)
+                ->post($url, [
+                    'fields' => $fields
+                ]);
+
+            if ($response->failed()) {
+                Log::error("Firestore Chat API failed: " . $response->body());
+                return false;
+            }
+
+            return true;
+
+        } catch (\Exception $e) {
+            Log::error("Failed to add chat message: " . $e->getMessage());
+            return false;
         }
     }
 }

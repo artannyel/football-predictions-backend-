@@ -51,13 +51,14 @@ class UserController extends Controller
         $validated = $request->validate([
             'notify_results' => 'boolean',
             'notify_reminders' => 'boolean',
+            'notify_chat' => 'boolean',
         ]);
 
         $user = $request->user();
         $user->update($validated);
 
         return response()->json([
-            'message' => 'Settings updated.',
+            'message' => __('messages.user.settings_updated'),
             'data' => new UserResource($user),
         ]);
     }

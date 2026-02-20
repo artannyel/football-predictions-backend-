@@ -9,6 +9,7 @@ return [
     'user' => [
         'registered' => 'Usuário registrado com sucesso',
         'updated' => 'Usuário atualizado com sucesso',
+        'settings_updated' => 'Configurações atualizadas com sucesso.',
     ],
     'league' => [
         'created' => 'Liga criada com sucesso',
@@ -27,5 +28,12 @@ return [
         'invalid_match' => 'Esta partida não pertence à competição da liga.',
         'not_found' => 'Palpite não encontrado.',
         'unauthorized' => 'Você não tem permissão para visualizar este palpite.',
+    ],
+    'powerup' => [
+        'insufficient_balance' => 'Saldo de Coringas insuficiente.',
+    ],
+    'chat' => [
+        'sent' => 'Mensagem enviada com sucesso.',
+        'failed' => 'Falha ao enviar mensagem.',
     ],
 ];

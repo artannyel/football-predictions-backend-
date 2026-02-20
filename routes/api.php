@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AdminController;
+use App\Http\Controllers\ChatController;
 use App\Http\Controllers\CompetitionController;
 use App\Http\Controllers\LeagueController;
 use App\Http\Controllers\MatchController;
@@ -76,6 +77,9 @@ Route::middleware(['auth.firebase'])->group(function () {
     Route::post('/leagues/{id}', [LeagueController::class, 'update']);
     Route::get('/leagues/{id}/ranking', [LeagueController::class, 'ranking']);
     Route::get('/leagues/{id}/feed', [LeagueController::class, 'feed']);
+
+    // Chat
+    Route::post('/leagues/{id}/chat', [ChatController::class, 'sendMessage']);
 
     // Jogos disponíveis para palpitar NA LIGA
     Route::get('/leagues/{id}/matches/upcoming', [LeagueController::class, 'upcomingMatches']);

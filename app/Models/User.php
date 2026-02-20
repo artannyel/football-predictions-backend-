@@ -28,6 +28,7 @@ class User extends Authenticatable
         'photo_url',
         'notify_results',
         'notify_reminders',
+        'notify_chat',
     ];
 
     /**
@@ -52,6 +53,7 @@ class User extends Authenticatable
             'password' => 'hashed',
             'notify_results' => 'boolean',
             'notify_reminders' => 'boolean',
+            'notify_chat' => 'boolean',
         ];
     }
 
