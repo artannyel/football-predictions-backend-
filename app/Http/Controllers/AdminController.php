@@ -11,6 +11,7 @@ use App\Jobs\RecalculateAllStats;
 use App\Jobs\RecalculateBadges;
 use App\Jobs\RecalculateGlobalStats;
 use App\Jobs\RunImportMatches;
+use App\Models\Competition;
 use App\Models\FootballMatch;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -121,6 +122,53 @@ class AdminController extends Controller
         $matches = $action->execute();
 
         return response()->json(['data' => MatchResource::collection($matches)]);
+    }
+
+    public function listMatches(Request $request): JsonResponse
+    {
+        $query = FootballMatch::with(['homeTeam', 'awayTeam', 'competition']);
+
+        if ($request->has('status')) {
+            $query->where('status', $request->input('status'));
+        }
+
+        if ($request->has('competition_id')) {
+            $query->where('competition_id', $request->input('competition_id'));
+        }
+
+        if ($request->has('date_from')) {
+            $query->whereDate('utc_date', '>=', $request->input('date_from'));
+        }
+
+        if ($request->has('date_to')) {
+            $query->whereDate('utc_date', '<=', $request->input('date_to'));
+        }
+
+        if ($request->has('team_name')) {
+            $term = '%' . $request->input('team_name') . '%';
+            $query->where(function ($q) use ($term) {
+                $q->whereHas('homeTeam', fn($sq) => $sq->where('name', 'like', $term)->orWhere('short_name', 'like', $term))
+                  ->orWhereHas('awayTeam', fn($sq) => $sq->where('name', 'like', $term)->orWhere('short_name', 'like', $term));
+            });
+        }
+
+        $matches = $query->orderBy('utc_date', 'desc')->paginate(20);
+
+        return response()->json(MatchResource::collection($matches)->response()->getData(true));
+    }
+
+    public function getFilters(): JsonResponse
+    {
+        $competitions = Competition::select('external_id as id', 'name')->orderBy('name')->get();
+
+        $statuses = [
+            'SCHEDULED', 'TIMED', 'IN_PLAY', 'PAUSED', 'FINISHED', 'POSTPONED', 'SUSPENDED', 'CANCELED'
+        ];
+
+        return response()->json([
+            'competitions' => $competitions,
+            'statuses' => $statuses,
+        ]);
     }
 
     public function fixMatch(Request $request, string $id, FixMatchAction $action): JsonResponse

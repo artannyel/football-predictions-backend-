@@ -32,6 +32,8 @@ Route::middleware(['auth.admin'])->prefix('admin')->group(function () {
     Route::post('/distribute-powerups', [AdminController::class, 'distributePowerUps']);
 
     // Manual Match Fix
+    Route::get('/matches', [AdminController::class, 'listMatches']); // Novo
+    Route::get('/filters', [AdminController::class, 'getFilters']); // Novo
     Route::get('/matches/stuck', [AdminController::class, 'listStuckMatches']);
     Route::post('/matches/{id}/fix', [AdminController::class, 'fixMatch']);
 

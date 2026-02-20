@@ -18,9 +18,19 @@ class MatchResource extends JsonResource
             'id' => $this->external_id,
             'utc_date' => $this->utc_date->toIso8601String(),
             'status' => $this->status,
+            'is_manual_update' => (bool) $this->is_manual_update,
             'matchday' => $this->matchday,
             'stage' => $this->stage,
             'group' => $this->group,
+            'competition' => $this->whenLoaded('competition', function () {
+                return [
+                    'id' => $this->competition->external_id,
+                    'name' => $this->competition->name,
+                    'code' => $this->competition->code,
+                    'emblem' => $this->competition->emblem,
+                    'type' => $this->competition->type,
+                ];
+            }),
             'home_team' => [
                 'id' => $this->homeTeam?->external_id,
                 'name' => $this->homeTeam?->name,
