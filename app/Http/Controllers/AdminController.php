@@ -18,7 +18,6 @@ use App\Models\FootballMatch;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\File;
 
 class AdminController extends Controller
@@ -125,18 +124,6 @@ class AdminController extends Controller
         DistributePowerUps::dispatch();
 
         return response()->json(['message' => 'Power-Up distribution job dispatched.']);
-    }
-
-    public function normalizeAvatars(Request $request): JsonResponse
-    {
-        // Roda o comando de forma síncrona para ver o output
-        Artisan::call('users:normalize-avatars');
-        $output = Artisan::output();
-
-        return response()->json([
-            'message' => 'Avatar normalization executed.',
-            'output' => $output,
-        ]);
     }
 
     public function listStuckMatches(ListStuckMatchesAction $action): JsonResponse

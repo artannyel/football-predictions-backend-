@@ -35,9 +35,6 @@ Route::middleware(['auth.admin'])->prefix('admin')->group(function () {
     Route::post('/import-matches', [AdminController::class, 'importMatches']);
     Route::post('/distribute-powerups', [AdminController::class, 'distributePowerUps']);
 
-    // System Maintenance
-    Route::post('/normalize-avatars', [AdminController::class, 'normalizeAvatars']); // Novo
-
     // Manual Match Fix
     Route::get('/matches', [AdminController::class, 'listMatches']);
     Route::get('/filters', [AdminController::class, 'getFilters']);
