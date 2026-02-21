@@ -27,7 +27,6 @@ class SendMatchResultNotification implements ShouldQueue
 
     public function handle(OneSignalService $oneSignal): void
     {
-        // Verifica preferência do usuário
         $user = User::find($this->userId);
         if (!$user || !$user->notify_results) {
             return;
@@ -68,6 +67,12 @@ class SendMatchResultNotification implements ShouldQueue
             'click_action' => 'FLUTTER_NOTIFICATION_CLICK',
             'badges_awarded' => array_map(fn($b) => $b->slug, $this->newBadges),
             'badges_revoked' => array_map(fn($b) => $b->slug, $this->revokedBadges),
+            'android_group' => 'results_league_' . $this->leagueId, // Agrupamento por Liga
+            'thread_id' => 'results_league_' . $this->leagueId,
+            'android_group_message' => [
+                'en' => 'You have $[notif_count] new results in this league.',
+                'pt' => 'Você tem $[notif_count] novos resultados nesta liga.',
+            ],
         ], $url);
     }
 

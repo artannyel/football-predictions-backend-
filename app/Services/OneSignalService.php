@@ -23,7 +23,7 @@ class OneSignalService
      * @param array $userIds Lista de UUIDs dos usuários (external_id no OneSignal)
      * @param string $title Título da notificação
      * @param string $message Corpo da mensagem
-     * @param array|null $data Dados adicionais (payload)
+     * @param array|null $data Dados adicionais (payload) e configurações (android_group, etc)
      * @param string|null $url URL para abrir ao clicar (Web)
      */
     public function sendToUsers(array $userIds, string $title, string $message, ?array $data = null, ?string $url = null): void
@@ -47,8 +47,35 @@ class OneSignalService
                 'headings' => ['en' => $title, 'pt' => $title],
                 'contents' => ['en' => $message, 'pt' => $message],
                 'small_icon' => 'ic_stat_notification_icon',
-                'data' => $data,
             ];
+
+            // Extrai chaves especiais de configuração do $data e move para a raiz
+            $specialKeys = [
+                'android_group',
+                'android_group_message',
+                'thread_id',
+                'collapse_id',
+                'ios_badgeType',
+                'ios_badgeCount',
+                'priority',
+                'ttl'
+            ];
+
+            $customData = [];
+
+            if ($data) {
+                foreach ($data as $key => $value) {
+                    if (in_array($key, $specialKeys)) {
+                        $payload[$key] = $value;
+                    } else {
+                        $customData[$key] = $value;
+                    }
+                }
+            }
+
+            if (!empty($customData)) {
+                $payload['data'] = $customData;
+            }
 
             if ($url) {
                 $payload['url'] = $url;
@@ -84,8 +111,34 @@ class OneSignalService
                 'headings' => ['en' => $title, 'pt' => $title],
                 'contents' => ['en' => $message, 'pt' => $message],
                 'small_icon' => 'ic_stat_notification_icon',
-                'data' => $data,
             ];
+
+            $specialKeys = [
+                'android_group',
+                'android_group_message',
+                'thread_id',
+                'collapse_id',
+                'ios_badgeType',
+                'ios_badgeCount',
+                'priority',
+                'ttl'
+            ];
+
+            $customData = [];
+
+            if ($data) {
+                foreach ($data as $key => $value) {
+                    if (in_array($key, $specialKeys)) {
+                        $payload[$key] = $value;
+                    } else {
+                        $customData[$key] = $value;
+                    }
+                }
+            }
+
+            if (!empty($customData)) {
+                $payload['data'] = $customData;
+            }
 
             if ($url) {
                 $payload['url'] = $url;

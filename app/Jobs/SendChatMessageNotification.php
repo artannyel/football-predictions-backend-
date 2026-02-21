@@ -45,6 +45,12 @@ class SendChatMessageNotification implements ShouldQueue
                 'type' => 'chat_message',
                 'league_id' => $this->leagueId,
                 'click_action' => 'FLUTTER_NOTIFICATION_CLICK',
+                'android_group' => 'league_' . $this->leagueId,
+                'thread_id' => 'league_' . $this->leagueId,
+                'android_group_message' => [
+                    'en' => 'You have $[notif_count] new messages in this league.',
+                    'pt' => 'Você tem $[notif_count] novas mensagens nesta liga.',
+                ],
             ], $url);
         }
     }
