@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Models\User;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 
 class NormalizeUserAvatars extends Command
@@ -16,43 +17,44 @@ class NormalizeUserAvatars extends Command
         $disk = config('filesystems.default');
         $users = User::whereNotNull('photo_url')->get();
         $count = 0;
+        $errors = 0;
 
-        $this->info("Found {$users->count()} users with photos. Starting normalization...");
+        $this->info("Found {$users->count()} users with photos. Starting normalization on disk: {$disk}...");
 
         foreach ($users as $user) {
             $currentPath = $user->photo_url;
             $expectedPath = 'users/' . $user->id . '.webp';
 
-            // Se já está no padrão, pula
             if ($currentPath === $expectedPath) {
                 continue;
             }
 
-            // Verifica se o arquivo atual existe
             if (!Storage::disk($disk)->exists($currentPath)) {
                 $this->warn("File not found for User {$user->id}: {$currentPath}");
                 continue;
             }
 
-            // Move (Renomeia)
             try {
-                // Se já existir um arquivo no destino (lixo antigo), apaga antes
-                if (Storage::disk($disk)->exists($expectedPath)) {
-                    Storage::disk($disk)->delete($expectedPath);
+                $copied = Storage::disk($disk)->copy($currentPath, $expectedPath);
+
+                if ($copied) {
+                    $user->update(['photo_url' => $expectedPath]);
+
+                    Storage::disk($disk)->delete($currentPath);
+
+                    $this->info("Normalized User {$user->id}: {$currentPath} -> {$expectedPath}");
+                    $count++;
+                } else {
+                    $this->error("Failed to copy file for User {$user->id}");
+                    $errors++;
                 }
-
-                Storage::disk($disk)->move($currentPath, $expectedPath);
-
-                // Atualiza banco
-                $user->update(['photo_url' => $expectedPath]);
-
-                $this->info("Normalized User {$user->id}: {$currentPath} -> {$expectedPath}");
-                $count++;
             } catch (\Exception $e) {
-                $this->error("Failed to move file for User {$user->id}: " . $e->getMessage());
+                $this->error("Exception for User {$user->id}: " . $e->getMessage());
+                Log::error("NormalizeAvatars Error: " . $e->getMessage());
+                $errors++;
             }
         }
 
-        $this->info("Normalization complete. {$count} avatars updated.");
+        $this->info("Normalization complete. {$count} avatars updated. {$errors} errors.");
     }
 }
