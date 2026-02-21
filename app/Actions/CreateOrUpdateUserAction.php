@@ -16,33 +16,33 @@ class CreateOrUpdateUserAction
             'email' => $dto->email,
         ];
 
-        $user = User::where('firebase_uid', $dto->firebaseUid)->first();
+        // 1. Cria ou atualiza o usuário primeiro para ter o ID
+        $user = User::updateOrCreate(
+            ['firebase_uid' => $dto->firebaseUid],
+            $userData
+        );
 
+        // 2. Processa a foto se houver
         if ($dto->photo) {
             $disk = config('filesystems.default');
 
-            if ($user && $user->photo_url) {
-                if (Storage::disk($disk)->exists($user->photo_url)) {
-                    Storage::disk($disk)->delete($user->photo_url);
-                }
-            }
-
-            // Muda extensão para .webp
-            $filename = pathinfo($dto->photo->hashName(), PATHINFO_FILENAME) . '.webp';
+            // Nome fixo baseado no ID do usuário
+            $filename = $user->id . '.webp';
             $path = 'users/' . $filename;
 
             $image = Image::read($dto->photo)
                 ->cover(500, 500)
                 ->toWebp(80);
 
+            // Sobrescreve o arquivo existente (se houver)
             Storage::disk($disk)->put($path, (string) $image, 'public');
 
-            $userData['photo_url'] = $path;
+            // Atualiza o caminho no banco se mudou (ou se era null)
+            if ($user->photo_url !== $path) {
+                $user->update(['photo_url' => $path]);
+            }
         }
 
-        return User::updateOrCreate(
-            ['firebase_uid' => $dto->firebaseUid],
-            $userData
-        );
+        return $user;
     }
 }
