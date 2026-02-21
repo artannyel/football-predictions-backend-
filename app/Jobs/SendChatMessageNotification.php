@@ -38,7 +38,7 @@ class SendChatMessageNotification implements ShouldQueue
         $body = "{$this->senderName}: {$this->messageText}";
 
         $frontendUrl = env('FRONTEND_URL');
-        $url = $frontendUrl ? "{$frontendUrl}/ligas/{$this->leagueId}" : null;
+        $url = $frontendUrl ? "{$frontendUrl}/ligas/{$this->leagueId}/chat" : null;
 
         foreach (array_chunk($recipients, 500) as $chunk) {
             $oneSignal->sendToUsers($chunk, $title, $body, [
