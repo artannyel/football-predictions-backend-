@@ -117,16 +117,21 @@ class FirestoreService
             $accessToken = $this->getAccessToken();
             if (!$accessToken) return false;
 
-            // URL para criar documento na subcoleção 'messages'
-            // POST https://firestore.googleapis.com/v1/projects/{projectId}/databases/(default)/documents/leagues/{leagueId}/messages
             $url = "https://firestore.googleapis.com/v1/projects/{$this->projectId}/databases/(default)/documents/leagues/{$leagueId}/messages";
 
             $fields = [
                 'text' => ['stringValue' => $messageData['text']],
-                'userId' => ['stringValue' => $messageData['userId']],
-                'userName' => ['stringValue' => $messageData['userName']],
-                'createdAt' => ['timestampValue' => now()->toIso8601String()], // Formato RFC 3339
+                'type' => ['stringValue' => $messageData['type'] ?? 'user'], // Default 'user'
+                'createdAt' => ['timestampValue' => now()->toIso8601String()],
             ];
+
+            if (!empty($messageData['userId'])) {
+                $fields['userId'] = ['stringValue' => $messageData['userId']];
+            }
+
+            if (!empty($messageData['userName'])) {
+                $fields['userName'] = ['stringValue' => $messageData['userName']];
+            }
 
             if (!empty($messageData['userPhoto'])) {
                 $fields['userPhoto'] = ['stringValue' => $messageData['userPhoto']];
