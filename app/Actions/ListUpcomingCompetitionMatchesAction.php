@@ -20,6 +20,7 @@ class ListUpcomingCompetitionMatchesAction
             ->where('competition_id', $league->competition_id)
             ->where('utc_date', '>', now())
             ->where('utc_date', '<=', now()->addDays(3))
+            ->whereNot('status', 'POSTPONED')
             // Filtra jogos que o usuário JÁ palpitou NESTA liga
             ->whereDoesntHave('predictions', function ($query) use ($userId, $leagueId) {
                 $query->where('user_id', $userId)
