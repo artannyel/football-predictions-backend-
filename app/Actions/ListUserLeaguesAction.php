@@ -69,6 +69,7 @@ class ListUserLeaguesAction
             $league->pending_predictions_count = FootballMatch::where('competition_id', $league->competition_id)
                 ->where('utc_date', '>', now())
                 ->where('utc_date', '<=', now()->addDays(3))
+                ->whereNot('status', 'POSTPONED')
                 ->whereDoesntHave('predictions', function ($q) use ($user, $league) {
                     $q->where('user_id', $user->id)
                       ->where('league_id', $league->id);
