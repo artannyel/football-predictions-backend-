@@ -36,12 +36,13 @@ class GetMatchPredictionStatsAction
             ];
         }
 
-        // 2. Histórico Recente (Form Guide)
+        // 2. Histórico Recente (Form Guide) e H2H
         $match = FootballMatch::where('external_id', $matchExternalId)->first();
         $form = [
             'home' => [],
             'away' => [],
         ];
+        $h2h = [];
 
         if ($match) {
             if ($match->home_team_id) {
@@ -50,9 +51,14 @@ class GetMatchPredictionStatsAction
             if ($match->away_team_id) {
                 $form['away'] = $this->getTeamForm($match->away_team_id, $match->utc_date);
             }
+
+            if ($match->home_team_id && $match->away_team_id) {
+                $h2h = $this->getHeadToHead($match->home_team_id, $match->away_team_id, $match->utc_date);
+            }
         }
 
         $result['form'] = $form;
+        $result['h2h'] = $h2h;
 
         return $result;
     }
@@ -92,6 +98,49 @@ class GetMatchPredictionStatsAction
                 'opponent' => $opponentName,
                 'date' => $match->utc_date,
                 'is_home' => $isHome,
+            ];
+        })->toArray();
+    }
+
+    private function getHeadToHead(int $teamA, int $teamB, $beforeDate): array
+    {
+        $matches = FootballMatch::where('status', 'FINISHED')
+            ->where('utc_date', '<', $beforeDate)
+            ->where(function ($q) use ($teamA, $teamB) {
+                $q->where(function ($sq) use ($teamA, $teamB) {
+                    $sq->where('home_team_id', $teamA)
+                       ->where('away_team_id', $teamB);
+                })->orWhere(function ($sq) use ($teamA, $teamB) {
+                    $sq->where('home_team_id', $teamB)
+                       ->where('away_team_id', $teamA);
+                });
+            })
+            ->orderBy('utc_date', 'desc')
+            ->limit(5)
+            ->get();
+
+        return $matches->map(function ($match) use ($teamA) {
+            // Referência sempre em relação ao Team A (Mandante do jogo atual)
+            $isHome = $match->home_team_id === $teamA;
+
+            $scoreHome = $match->score_fulltime_home;
+            $scoreAway = $match->score_fulltime_away;
+
+            // Resultado para o Team A
+            $result = 'D';
+            if ($isHome) {
+                if ($scoreHome > $scoreAway) $result = 'W';
+                elseif ($scoreHome < $scoreAway) $result = 'L';
+            } else {
+                if ($scoreAway > $scoreHome) $result = 'W';
+                elseif ($scoreAway < $scoreHome) $result = 'L';
+            }
+
+            return [
+                'result' => $result,
+                'score' => "{$scoreHome}x{$scoreAway}",
+                'date' => $match->utc_date,
+                'home_team_id' => $match->home_team_id,
             ];
         })->toArray();
     }
