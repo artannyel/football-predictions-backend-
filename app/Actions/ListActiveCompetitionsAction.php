@@ -10,8 +10,9 @@ class ListActiveCompetitionsAction
     public function execute(): Collection
     {
         return Competition::with(['area', 'currentSeason'])
-            ->whereHas('currentSeason', function ($query) {
-                $query->where('end_date', '>=', now()->toDateString());
+            ->whereHas('matches', function ($query) {
+                $query->where('utc_date', '>=', now()->startOfDay())
+                      ->whereIn('status', ['SCHEDULED', 'TIMED']);
             })
             ->get();
     }
