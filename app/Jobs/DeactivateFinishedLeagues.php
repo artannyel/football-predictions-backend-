@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Models\FootballMatch;
 use App\Models\League;
+use Carbon\Carbon;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -23,13 +24,9 @@ class DeactivateFinishedLeagues implements ShouldQueue
 
         if ($this->competitionId) {
             $query->where('competition_id', $this->competitionId);
-        } else {
-            $query->whereHas('competition.currentSeason', function ($q) {
-                $q->where('end_date', '<=', now()->toDateString());
-            });
         }
 
-        $leagues = $query->with('competition')->get();
+        $leagues = $query->with(['competition.currentSeason'])->get();
 
         if ($leagues->isEmpty()) {
             return;
@@ -39,25 +36,47 @@ class DeactivateFinishedLeagues implements ShouldQueue
 
         foreach ($leaguesByCompetition as $compId => $groupLeagues) {
             $sampleLeague = $groupLeagues->first();
+            $seasonId = $sampleLeague->competition->current_season_id;
 
+            // 1. Verifica se há jogos pendentes (Futuros ou Ao Vivo)
             $hasPendingMatches = FootballMatch::where('competition_id', $compId)
-                ->where('season_id', $sampleLeague->competition->current_season_id)
+                ->where('season_id', $seasonId)
                 ->whereNotIn('status', ['FINISHED', 'CANCELED', 'AWARDED'])
                 ->exists();
 
             if ($hasPendingMatches) {
-                if ($this->competitionId) {
-                    Log::info("Competition {$compId} not finished yet. Pending matches exist.");
-                }
                 continue;
             }
 
-            // Processa cada liga individualmente para definir o pódio
+            // 2. Verifica Buffer de Segurança (7 dias após o último jogo)
+            $lastMatch = FootballMatch::where('competition_id', $compId)
+                ->where('season_id', $seasonId)
+                ->where('status', 'FINISHED')
+                ->orderBy('utc_date', 'desc')
+                ->first();
+
+            $bufferDate = now()->subDays(7);
+
+            if ($lastMatch) {
+                // Se o último jogo foi há menos de 7 dias, mantém ativa
+                if ($lastMatch->utc_date > $bufferDate) {
+                    Log::info("Competition {$compId} finished recently ({$lastMatch->utc_date->format('Y-m-d')}). Keeping active for buffer period.");
+                    continue;
+                }
+            } else {
+                // Se não tem jogos finalizados (ex: cancelado ou erro), verifica data da season
+                $seasonEndDate = $sampleLeague->competition->currentSeason->end_date;
+                if ($seasonEndDate && Carbon::parse($seasonEndDate) > $bufferDate) {
+                    continue;
+                }
+            }
+
+            // 3. Desativa as ligas
             foreach ($groupLeagues as $league) {
                 $this->processPodiumAndDeactivate($league);
             }
 
-            Log::info("Processed " . count($groupLeagues) . " leagues for competition {$compId} (Season Finished).");
+            Log::info("Deactivated " . count($groupLeagues) . " leagues for competition {$compId}.");
         }
     }
 

@@ -2,7 +2,6 @@
 
 namespace App\Console\Commands;
 
-use App\Jobs\DeactivateFinishedLeagues;
 use App\Jobs\ProcessMatchResults;
 use App\Models\FootballMatch;
 use App\Services\FootballDataService;
@@ -55,14 +54,8 @@ class UpdateLiveMatches extends Command
 
         $this->info("Updating live matches for competitions: " . $competitionsToUpdate->implode(', '));
 
-        $finishedCompetitions = [];
-
         foreach ($competitionsToUpdate as $competitionId) {
             $hasUpdates = $this->updateCompetitionMatches($service, $competitionId);
-
-            if ($hasUpdates['finished']) {
-                $finishedCompetitions[] = $competitionId;
-            }
 
             if ($hasUpdates['changed']) {
                 $firestore->signalCompetitionUpdate($competitionId, [
@@ -73,18 +66,14 @@ class UpdateLiveMatches extends Command
 
             sleep(2);
         }
-
-        foreach (array_unique($finishedCompetitions) as $compId) {
-            DeactivateFinishedLeagues::dispatch($compId);
-        }
     }
 
     /**
-     * Retorna array ['changed' => bool, 'finished' => bool, 'count' => int]
+     * Retorna array ['changed' => bool, 'count' => int]
      */
     private function updateCompetitionMatches(FootballDataService $service, int $competitionId): array
     {
-        $result = ['changed' => false, 'finished' => false, 'count' => 0];
+        $result = ['changed' => false, 'count' => 0];
 
         try {
             $today = now()->format('Y-m-d');
@@ -140,10 +129,6 @@ class UpdateLiveMatches extends Command
 
                         $result['changed'] = true;
                         $result['count']++;
-                    }
-
-                    if ($match->wasChanged('status') && $match->status === 'FINISHED') {
-                        $result['finished'] = true;
                     }
                 }
             }
