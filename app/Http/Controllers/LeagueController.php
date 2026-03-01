@@ -191,6 +191,7 @@ class LeagueController extends Controller
                 'badges.name as badge_name',
                 'badges.icon as badge_icon',
                 'badges.slug as badge_slug',
+                'badges.description as badge_description',
                 'matches.external_id as match_id',
                 'home.short_name as home_team',
                 'home.crest as home_team_crest',

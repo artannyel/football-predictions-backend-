@@ -29,6 +29,7 @@ class LeagueFeedResource extends JsonResource
             'badge' => [
                 'name' => $this->badge_name,
                 'slug' => $this->badge_slug,
+                'description' => $this->badge_description,
                 'icon_url' => $this->badge_icon ? asset(Storage::disk($disk)->url($this->badge_icon)) : null,
             ],
             'match' => $this->match_id ? [
