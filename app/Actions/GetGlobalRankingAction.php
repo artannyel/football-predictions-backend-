@@ -32,6 +32,7 @@ class GetGlobalRankingAction
             ->orderBy('winner_diff_count', 'desc')
             ->orderBy('winner_goal_count', 'desc')
             ->orderBy('winner_only_count', 'desc')
+            ->orderBy('points', 'desc')
             ->orderBy('error_count', 'asc')
             ->limit($limit)
             ->get();
@@ -63,7 +64,7 @@ class GetGlobalRankingAction
         $myRankData = null;
         if ($myStats) {
             $subquery = DB::table('user_stats')
-                ->select('user_id', DB::raw('ROW_NUMBER() OVER (ORDER BY exact_score_count DESC, winner_diff_count DESC, winner_goal_count DESC, winner_only_count DESC, error_count ASC) as rank'))
+                ->select('user_id', DB::raw('ROW_NUMBER() OVER (ORDER BY exact_score_count DESC, winner_diff_count DESC, winner_goal_count DESC, winner_only_count DESC, points DESC, error_count ASC) as rank'))
                 ->where('period', $period);
 
             $rankRow = DB::table(DB::raw("({$subquery->toSql()}) as ranked"))

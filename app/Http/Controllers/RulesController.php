@@ -88,7 +88,7 @@ class RulesController extends Controller
                 'rules' => [
                     [
                         'title' => '🎯 Qualidade > Quantidade',
-                        'description' => 'A hierarquia é: Placares Exatos ➔ Saldos ➔ Gols ➔ Vencedores ➔ Menos Erros.'
+                        'description' => 'A hierarquia é: Placares Exatos ➔ Saldos ➔ Gols ➔ Vencedores ➔ Pontuação Total ➔ Menos Erros.'
                     ],
                     [
                         'title' => '🛡️ Anti-Farm',
