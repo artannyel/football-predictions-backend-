@@ -4,33 +4,39 @@ namespace App\Services;
 
 use App\Models\FootballMatch;
 use App\Models\Prediction;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class UserStatsService
 {
+    protected string $timezone = 'America/Sao_Paulo';
+
     /**
      * Processa as estatísticas globais para um usuário e jogo.
      * Deve ser chamado APÓS o palpite ser salvo com os novos pontos.
      */
     public function processPrediction(string $userId, FootballMatch $match): void
     {
-        // 1. Busca o melhor palpite do usuário para este jogo (considerando todas as ligas)
-        // Filtra apenas palpites de ligas válidas (Anti-Farm)
+        $logger = Log::build([
+            'driver' => 'single',
+            'path' => storage_path('logs/user_stats.log'),
+        ]);
+
+        // 1. Busca o melhor palpite
         $bestPrediction = Prediction::query()
             ->join('league_user', function ($join) {
                 $join->on('predictions.league_id', '=', 'league_user.league_id')
-                     ->where('league_user.user_id', '=', DB::raw('predictions.user_id')); // Join com o próprio usuário para pegar created_at dele? Não.
-                     // Precisamos validar a liga, não o usuário.
+                     ->where('league_user.user_id', '=', DB::raw('predictions.user_id'));
             })
             ->where('predictions.user_id', $userId)
             ->where('predictions.match_id', $match->external_id)
             ->whereExists(function ($query) use ($match) {
-                // Regra Anti-Farm: A liga deve ter um 2º membro que entrou ANTES do jogo
                 $query->select(DB::raw(1))
                     ->from('league_user as lu')
                     ->whereColumn('lu.league_id', 'predictions.league_id')
                     ->orderBy('lu.created_at', 'asc')
-                    ->offset(1) // Pula o 1º
+                    ->offset(1)
                     ->limit(1)
                     ->where('lu.created_at', '<', $match->utc_date);
             })
@@ -38,14 +44,13 @@ class UserStatsService
             ->select('predictions.*')
             ->first();
 
-        // Se não tiver nenhum palpite válido (todos em ligas farm ou sem palpites), zera ou remove
         if (!$bestPrediction) {
-            // Se existia registro, precisa remover e estornar os pontos
-            $this->removeStats($userId, $match);
+            $logger->info("No valid prediction found for User {$userId} Match {$match->external_id}. Removing stats.");
+            $this->removeStats($userId, $match, $logger);
             return;
         }
 
-        // 2. Compara com o registro atual em user_match_stats
+        // 2. Compara com o registro atual
         $currentStat = DB::table('user_match_stats')
             ->where('user_id', $userId)
             ->where('match_id', $match->external_id)
@@ -62,6 +67,8 @@ class UserStatsService
             return;
         }
 
+        $logger->info("Processing User {$userId} Match {$match->external_id}: Old={$oldPoints} ({$oldType}) -> New={$newPoints} ({$newType})");
+
         // 3. Atualiza user_match_stats
         DB::table('user_match_stats')->updateOrInsert(
             ['user_id' => $userId, 'match_id' => $match->external_id],
@@ -73,22 +80,61 @@ class UserStatsService
             ]
         );
 
-        // 4. Propaga Delta
-        $deltaPoints = $newPoints - $oldPoints;
-        $isNewMatch = !$currentStat;
-
-        $periods = [
+        // 4. Calcula Períodos
+        // Usa timezone BRT para definir o mês/ano
+        $newDate = Carbon::parse($match->utc_date)->setTimezone($this->timezone);
+        $newPeriods = [
             'GLOBAL',
-            $match->utc_date->format('Y'),
-            $match->utc_date->format('Y-m'),
+            $newDate->format('Y'),
+            $newDate->format('Y-m'),
         ];
 
-        foreach ($periods as $period) {
-            $this->updateAggregateStats($userId, $period, $deltaPoints, $oldType, $newType, $isNewMatch);
+        $oldPeriods = [];
+        if ($currentStat && $currentStat->match_date) {
+            $oldDate = Carbon::parse($currentStat->match_date)->setTimezone($this->timezone);
+            $oldPeriods = [
+                'GLOBAL',
+                $oldDate->format('Y'),
+                $oldDate->format('Y-m'),
+            ];
+        }
+
+        // 5. Aplica Atualizações
+        $isNewMatch = !$currentStat;
+
+        // Se os períodos mudaram (ex: mudou de mês), precisamos tratar separado
+        if (!$isNewMatch && ($newPeriods !== $oldPeriods)) {
+            $logger->info("Match changed period! Old: " . json_encode($oldPeriods) . " New: " . json_encode($newPeriods));
+
+            // Remove do período antigo
+            foreach ($oldPeriods as $period) {
+                // Se o período ainda existe no novo (ex: GLOBAL), aplica delta. Se não, remove tudo.
+                if (in_array($period, $newPeriods)) {
+                    // Período comum (ex: GLOBAL): Aplica Delta
+                    $this->updateAggregateStats($userId, $period, $newPoints - $oldPoints, $oldType, $newType, false, $logger);
+                } else {
+                    // Período exclusivo antigo (ex: Mês Passado): Remove tudo
+                    $this->revertStats($userId, $period, $oldPoints, $oldType, $logger);
+                }
+            }
+
+            // Adiciona no período novo
+            foreach ($newPeriods as $period) {
+                if (!in_array($period, $oldPeriods)) {
+                    // Período exclusivo novo (ex: Mês Novo): Adiciona tudo
+                    $this->addStats($userId, $period, $newPoints, $newType, $logger);
+                }
+            }
+        } else {
+            // Períodos iguais (caso comum): Aplica Delta em todos
+            $deltaPoints = $newPoints - $oldPoints;
+            foreach ($newPeriods as $period) {
+                $this->updateAggregateStats($userId, $period, $deltaPoints, $oldType, $newType, $isNewMatch, $logger);
+            }
         }
     }
 
-    private function removeStats($userId, FootballMatch $match)
+    private function removeStats($userId, FootballMatch $match, $logger)
     {
         $currentStat = DB::table('user_match_stats')
             ->where('user_id', $userId)
@@ -97,43 +143,86 @@ class UserStatsService
 
         if (!$currentStat) return;
 
-        // Estorna tudo
-        $deltaPoints = -($currentStat->points);
+        $oldPoints = $currentStat->points;
         $oldType = $currentStat->result_type;
+
+        $logger->info("Removing stats for User {$userId} Match {$match->external_id}: Reverting {$oldPoints} points.");
 
         DB::table('user_match_stats')->where('id', $currentStat->id)->delete();
 
+        $date = Carbon::parse($currentStat->match_date ?? $match->utc_date)->setTimezone($this->timezone);
         $periods = [
             'GLOBAL',
-            $match->utc_date->format('Y'),
-            $match->utc_date->format('Y-m'),
+            $date->format('Y'),
+            $date->format('Y-m'),
         ];
 
         foreach ($periods as $period) {
-            // isNewMatch = false (estamos removendo), mas precisamos decrementar total_predictions
-            // A função updateAggregateStats incrementa se isNewMatch=true.
-            // Para decrementar, precisamos de uma lógica de "remover".
-            // Vamos adaptar updateAggregateStats ou fazer manual aqui.
-
-            // Manual é mais seguro para remoção
-            $updates = [
-                'points' => DB::raw("points + $deltaPoints"),
-                'total_predictions' => DB::raw("total_predictions - 1"),
-            ];
-
-            if ($oldType) {
-                $col = $this->getTypeColumn($oldType);
-                if ($col) $updates[$col] = DB::raw("$col - 1");
-            }
-
-            DB::table('user_stats')
-                ->where('user_id', $userId)
-                ->where('period', $period)
-                ->update($updates);
+            $this->revertStats($userId, $period, $oldPoints, $oldType, $logger);
         }
     }
 
-    private function updateAggregateStats($userId, $period, $deltaPoints, $oldType, $newType, $isNewMatch)
+    // Função auxiliar para remover estatísticas de um período (Estorno total)
+    private function revertStats($userId, $period, $points, $type, $logger)
+    {
+        $updates = [
+            'points' => DB::raw("points - $points"),
+            'total_predictions' => DB::raw("total_predictions - 1"),
+        ];
+
+        if ($type) {
+            $col = $this->getTypeColumn($type);
+            if ($col) $updates[$col] = DB::raw("$col - 1");
+        }
+
+        $logger->info("Reverting [{$period}] for User {$userId}: -{$points} pts");
+
+        DB::table('user_stats')
+            ->where('user_id', $userId)
+            ->where('period', $period)
+            ->update($updates);
+    }
+
+    // Função auxiliar para adicionar estatísticas em um período (Inserção total)
+    private function addStats($userId, $period, $points, $type, $logger)
+    {
+        $updates = [
+            'points' => DB::raw("points + $points"),
+            'total_predictions' => DB::raw("total_predictions + 1"),
+        ];
+
+        if ($type) {
+            $col = $this->getTypeColumn($type);
+            if ($col) $updates[$col] = DB::raw("$col + 1");
+        }
+
+        $logger->info("Adding to [{$period}] for User {$userId}: +{$points} pts");
+
+        $affected = DB::table('user_stats')
+            ->where('user_id', $userId)
+            ->where('period', $period)
+            ->update($updates);
+
+        if ($affected === 0) {
+            $initialData = [
+                'user_id' => $userId,
+                'period' => $period,
+                'points' => $points,
+                'total_predictions' => 1,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ];
+
+            if ($type) {
+                $col = $this->getTypeColumn($type);
+                if ($col) $initialData[$col] = 1;
+            }
+
+            DB::table('user_stats')->insertOrIgnore($initialData);
+        }
+    }
+
+    private function updateAggregateStats($userId, $period, $deltaPoints, $oldType, $newType, $isNewMatch, $logger)
     {
         $updates = [];
 
@@ -156,6 +245,8 @@ class UserStatsService
         }
 
         if (empty($updates)) return;
+
+        $logger->info("Updating Aggregate [{$period}] for User {$userId}: Delta={$deltaPoints}");
 
         $affected = DB::table('user_stats')
             ->where('user_id', $userId)

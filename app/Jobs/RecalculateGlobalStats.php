@@ -9,6 +9,7 @@ use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
+use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -17,7 +18,13 @@ class RecalculateGlobalStats implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public $timeout = 7200; // 2 horas (pode demorar)
+    public $timeout = 7200; // 2 horas
+
+    public function middleware(): array
+    {
+        // Evita que dois jobs de recálculo rodem ao mesmo tempo
+        return [(new WithoutOverlapping('global_stats'))->releaseAfter(60)];
+    }
 
     public function handle(UserStatsService $userStatsService): void
     {
@@ -30,16 +37,10 @@ class RecalculateGlobalStats implements ShouldQueue
         Log::channel('recalculation')->info("Tables truncated. Processing matches...");
 
         // 2. Buscar jogos finalizados
-        // Processar em chunks para não estourar memória
         FootballMatch::where('status', 'FINISHED')
             ->orderBy('utc_date', 'asc')
             ->chunk(50, function ($matches) use ($userStatsService) {
                 foreach ($matches as $match) {
-                    // Busca palpites deste jogo
-                    // Precisamos iterar sobre os palpites para aplicar a lógica de "Melhor Palpite"
-                    // O Service espera (userId, match).
-                    // Então pegamos os userIds distintos que palpitaram neste jogo.
-
                     $userIds = Prediction::where('match_id', $match->external_id)
                         ->distinct()
                         ->pluck('user_id');
