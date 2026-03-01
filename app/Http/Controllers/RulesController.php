@@ -43,6 +43,13 @@ class RulesController extends Controller
                     'example' => 'Palpite 1x0, Resultado 0x1'
                 ]
             ],
+            'powerups' => [
+                [
+                    'name' => 'Coringa (x2)',
+                    'icon' => 'joker',
+                    'description' => 'Multiplica seus pontos na partida por 2. Se você acertar o placar exato (7 pts), ganha 14! Mas cuidado: o estoque é limitado e se errar, você perde o Coringa.',
+                ]
+            ],
             'tie_breakers' => [
                 [
                     'order' => 1,
