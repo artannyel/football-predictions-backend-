@@ -14,7 +14,6 @@ class UserStatsService
 
     /**
      * Processa as estatísticas globais para um usuário e jogo.
-     * Deve ser chamado APÓS o palpite ser salvo com os novos pontos.
      */
     public function processPrediction(string $userId, FootballMatch $match): void
     {
@@ -23,7 +22,7 @@ class UserStatsService
             'path' => storage_path('logs/user_stats.log'),
         ]);
 
-        // 1. Busca o melhor palpite
+        // 1. Busca o melhor palpite (Prioriza Qualidade sobre Pontos)
         $bestPrediction = Prediction::query()
             ->join('league_user', function ($join) {
                 $join->on('predictions.league_id', '=', 'league_user.league_id')
@@ -40,6 +39,16 @@ class UserStatsService
                     ->limit(1)
                     ->where('lu.created_at', '<', $match->utc_date);
             })
+            ->orderByRaw("
+                CASE predictions.result_type
+                    WHEN 'EXACT_SCORE' THEN 1
+                    WHEN 'WINNER_DIFF' THEN 2
+                    WHEN 'WINNER_GOAL' THEN 3
+                    WHEN 'WINNER_ONLY' THEN 4
+                    WHEN 'ERROR' THEN 5
+                    ELSE 6
+                END ASC
+            ")
             ->orderBy('predictions.points_earned', 'desc')
             ->select('predictions.*')
             ->first();
@@ -62,7 +71,6 @@ class UserStatsService
         $oldPoints = $currentStat->points ?? 0;
         $oldType = $currentStat->result_type ?? null;
 
-        // Se nada mudou, sai
         if ($currentStat && $newPoints === $oldPoints && $newType === $oldType) {
             return;
         }
@@ -81,7 +89,6 @@ class UserStatsService
         );
 
         // 4. Calcula Períodos
-        // Usa timezone BRT para definir o mês/ano
         $newDate = Carbon::parse($match->utc_date)->setTimezone($this->timezone);
         $newPeriods = [
             'GLOBAL',
@@ -102,31 +109,23 @@ class UserStatsService
         // 5. Aplica Atualizações
         $isNewMatch = !$currentStat;
 
-        // Se os períodos mudaram (ex: mudou de mês), precisamos tratar separado
         if (!$isNewMatch && ($newPeriods !== $oldPeriods)) {
             $logger->info("Match changed period! Old: " . json_encode($oldPeriods) . " New: " . json_encode($newPeriods));
 
-            // Remove do período antigo
             foreach ($oldPeriods as $period) {
-                // Se o período ainda existe no novo (ex: GLOBAL), aplica delta. Se não, remove tudo.
                 if (in_array($period, $newPeriods)) {
-                    // Período comum (ex: GLOBAL): Aplica Delta
                     $this->updateAggregateStats($userId, $period, $newPoints - $oldPoints, $oldType, $newType, false, $logger);
                 } else {
-                    // Período exclusivo antigo (ex: Mês Passado): Remove tudo
                     $this->revertStats($userId, $period, $oldPoints, $oldType, $logger);
                 }
             }
 
-            // Adiciona no período novo
             foreach ($newPeriods as $period) {
                 if (!in_array($period, $oldPeriods)) {
-                    // Período exclusivo novo (ex: Mês Novo): Adiciona tudo
                     $this->addStats($userId, $period, $newPoints, $newType, $logger);
                 }
             }
         } else {
-            // Períodos iguais (caso comum): Aplica Delta em todos
             $deltaPoints = $newPoints - $oldPoints;
             foreach ($newPeriods as $period) {
                 $this->updateAggregateStats($userId, $period, $deltaPoints, $oldType, $newType, $isNewMatch, $logger);
@@ -162,7 +161,6 @@ class UserStatsService
         }
     }
 
-    // Função auxiliar para remover estatísticas de um período (Estorno total)
     private function revertStats($userId, $period, $points, $type, $logger)
     {
         $updates = [
@@ -183,7 +181,6 @@ class UserStatsService
             ->update($updates);
     }
 
-    // Função auxiliar para adicionar estatísticas em um período (Inserção total)
     private function addStats($userId, $period, $points, $type, $logger)
     {
         $updates = [
