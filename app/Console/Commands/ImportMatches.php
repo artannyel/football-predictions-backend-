@@ -29,12 +29,12 @@ class ImportMatches extends Command
     /**
      * Execute the console command.
      */
-    public function handle(FootballDataService $service)
+    public function handle(FootballDataService $service): int
     {
         $competitionId = $this->argument('competition_id');
 
         if ($competitionId) {
-            $this->importMatchesForCompetition($service, $competitionId);
+            $this->importMatchesForCompetition($service, (int) $competitionId);
         } else {
             $competitions = Competition::all();
 
@@ -57,12 +57,14 @@ class ImportMatches extends Command
                 $this->newLine();
             }
         }
+
+        return 0;
     }
 
-    private function importMatchesForCompetition(FootballDataService $service, int $competitionId)
+    private function importMatchesForCompetition(FootballDataService $service, int $competitionId): void
     {
         $competition = Competition::where('external_id', $competitionId)->first();
-        $compName = $competition ? $competition->name : "ID $competitionId";
+        $compName = $competition ? $competition->name : "ID {$competitionId}";
 
         $this->info("Fetching matches for: {$compName}...");
 
@@ -81,6 +83,46 @@ class ImportMatches extends Command
         $matches = $response['matches'];
         $count = count($matches);
         $this->info("Found {$count} matches. Saving...");
+
+        // --- INÍCIO DA LÓGICA DE LIMPEZA (GHOST MATCHES) ---
+        $apiMatchIds = array_map(function ($m) { return $m['id']; }, $matches);
+
+        // Busca os IDs dos jogos no banco para a season atual desta competição
+        // Usa a season da primeira partida retornada
+        $seasonId = $matches[0]['season']['id'] ?? null;
+
+        if ($seasonId) {
+            $dbMatches = FootballMatch::where('competition_id', $competitionId)
+                ->where('season_id', $seasonId)
+                ->get();
+
+            $deletedCount = 0;
+            $canceledCount = 0;
+
+            foreach ($dbMatches as $dbMatch) {
+                if (!in_array($dbMatch->external_id, $apiMatchIds)) {
+                    // O jogo existe no banco, mas NÃO veio na API (Fantasma!)
+
+                    // Verifica se tem palpites
+                    $hasPredictions = $dbMatch->predictions()->exists();
+
+                    if ($hasPredictions) {
+                        // Se tem palpite, não podemos deletar fisicamente
+                        $dbMatch->update(['status' => 'CANCELED']);
+                        $canceledCount++;
+                    } else {
+                        // Seguro deletar
+                        $dbMatch->delete();
+                        $deletedCount++;
+                    }
+                }
+            }
+
+            if ($deletedCount > 0 || $canceledCount > 0) {
+                $this->warn("Ghost Cleanup: {$deletedCount} deleted, {$canceledCount} canceled.");
+            }
+        }
+        // --- FIM DA LÓGICA DE LIMPEZA ---
 
         $bar = $this->output->createProgressBar($count);
         $bar->start();
@@ -151,7 +193,7 @@ class ImportMatches extends Command
         $this->info("Matches for {$compName} imported successfully!");
     }
 
-    private function ensureTeamExists(array $teamData)
+    private function ensureTeamExists(array $teamData): void
     {
         Team::updateOrCreate(
             ['external_id' => $teamData['id']],
