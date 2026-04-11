@@ -20,7 +20,13 @@ class FootballDataService
     {
         return Http::withHeaders([
             'X-Auth-Token' => $this->token,
-        ])->baseUrl($this->baseUrl);
+            'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+            'Accept' => 'application/json',
+            'Accept-Encoding' => 'gzip, deflate, br',
+            'Connection' => 'keep-alive',
+        ])
+        ->timeout(15) // Aumenta o timeout para 15 segundos
+        ->baseUrl($this->baseUrl);
     }
 
     /**
