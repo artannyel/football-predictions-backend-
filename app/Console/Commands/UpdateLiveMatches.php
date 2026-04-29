@@ -105,18 +105,28 @@ class UpdateLiveMatches extends Command
                 // Lógica de Score baseada na Duração
                 $duration = $data['score']['duration'] ?? 'REGULAR';
 
+                $newHomeScore = null;
+                $newAwayScore = null;
+
                 if ($duration === 'REGULAR') {
-                    $homeScore = $data['score']['fullTime']['home'] ?? null;
-                    $awayScore = $data['score']['fullTime']['away'] ?? null;
+                    $newHomeScore = $data['score']['fullTime']['home'] ?? null;
+                    $newAwayScore = $data['score']['fullTime']['away'] ?? null;
                 } else {
-                    $homeScore = $data['score']['regularTime']['home'] ?? $data['score']['fullTime']['home'] ?? null;
-                    $awayScore = $data['score']['regularTime']['away'] ?? $data['score']['fullTime']['away'] ?? null;
+                    $newHomeScore = $data['score']['regularTime']['home'] ?? $data['score']['fullTime']['home'] ?? null;
+                    $newAwayScore = $data['score']['regularTime']['away'] ?? $data['score']['fullTime']['away'] ?? null;
+                }
+
+                if (in_array($match->status, ['FINISHED', 'AWARDED']) &&
+                    $match->score_fulltime_home !== null && $match->score_fulltime_away !== null &&
+                    $newHomeScore === null && $newAwayScore === null) {
+                    // Não faz nada, mantém os scores existentes no modelo
+                } else {
+                    $match->score_fulltime_home = $newHomeScore;
+                    $match->score_fulltime_away = $newAwayScore;
                 }
 
                 $match->score_winner = $data['score']['winner'] ?? null;
                 $match->score_duration = $duration;
-                $match->score_fulltime_home = $homeScore;
-                $match->score_fulltime_away = $awayScore;
                 $match->score_halftime_home = $data['score']['halfTime']['home'] ?? null;
                 $match->score_halftime_away = $data['score']['halfTime']['away'] ?? null;
 
